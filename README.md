@@ -29,7 +29,7 @@ Lines connect a *finished task* to the *next task*, so one department can appear
 
 ## Workspaces and sharing
 
-- Each tab is its own workspace. The Pionova sample opens in one tab and an empty workspace in another; **+** adds more.
+- Each tab is its own workspace. The Pionova and Atlas Cranes samples open side by side as tabs, next to an empty workspace; **+** adds more.
 - **Share** copies a link that holds the whole workspace, compressed into the URL fragment (`#m=…`). Opening the link loads it into a new tab. Nothing is uploaded to a server.
 - Models can also be exported and imported as JSON.
 
@@ -50,6 +50,6 @@ Then open http://localhost:8910. Opening `index.html` directly also works.
 - **Residential renovations** from social media and referral leads: qualify → site visit → proposal → contract and 25% deposit → permit → materials → reno trades → handover → final invoice.
 - **Change orders**: price → CEO approval → invoice.
 
-**Atlas Cranes** is a fictional crane manufacturer sample. It covers tender → engineering validation → negotiation → contract → design → planning → fabrication → assembly and load test → commissioning → invoicing, plus aftermarket service. Open it from the crane icon on the left rail.
+**Atlas Cranes** is a fictional crane manufacturer sample. It covers tender → engineering validation → negotiation → contract → design → planning → fabrication → assembly and load test → commissioning → invoicing, plus aftermarket service. It opens in its own tab next to Pionova; the house and crane icons on the left rail reopen either sample.
 
 **All figures in both samples are illustrative assumptions for a demo, not real company data.**

@@ -518,16 +518,19 @@ const DEFAULT_SC=()=>({preset:'Baseline',demand:0,winShift:0,leadLoss:0,price:0,
    ===================================================================== */
 let M, SC, RES=null, SNAPS=[], SEL=null;
 /* Workspaces = browser-style tabs, each with its own model, assumptions and saved scenarios */
-const WS={list:[],active:null};
+const WS={list:[],active:null,seeded:[]};
 const curWs=()=>WS.list.find(w=>w.id===WS.active);
 const BLANK=()=>({name:'New workspace',nodes:[],edges:[]});
 function newWs(model,sc,tag){return{id:uid('ws'),M:model,SC:sc||DEFAULT_SC(),SNAPS:[],tag:tag||''};}
-function persist(){try{localStorage.setItem('flowtwin.v3',JSON.stringify({active:WS.active,list:WS.list.map(w=>({id:w.id,M:w.M,SC:w.SC,SNAPS:w.SNAPS,tag:w.tag}))}));}catch(e){}}
+function persist(){try{localStorage.setItem('flowtwin.v3',JSON.stringify({active:WS.active,seeded:WS.seeded,list:WS.list.map(w=>({id:w.id,M:w.M,SC:w.SC,SNAPS:w.SNAPS,tag:w.tag}))}));}catch(e){}}
 function save(){const w=curWs();if(w){w.M=M;w.SC=SC;w.SNAPS=SNAPS;w.RES=RES;}persist();renderWsTabs();}
 function loadWs(){
   try{const s=JSON.parse(localStorage.getItem('flowtwin.v3')||'null');
-    if(s&&s.list&&s.list.length){WS.list=s.list.map(w=>({...w,SC:Object.assign(DEFAULT_SC(),w.SC||{}),SNAPS:w.SNAPS||[]}));WS.active=s.active;if(!curWs())WS.active=WS.list[0].id;return;}}catch(e){}
-  const a=newWs(PIONOVA(),PIONOVA_SC(),'SAMPLE'),b=newWs(BLANK());WS.list=[a,b];WS.active=a.id;}
+    if(s&&s.list&&s.list.length){WS.list=s.list.map(w=>({...w,SC:Object.assign(DEFAULT_SC(),w.SC||{}),SNAPS:w.SNAPS||[]}));WS.active=s.active;if(!curWs())WS.active=WS.list[0].id;
+      // browsers that saw an older default get the crane sample added once, next to Pionova
+      WS.seeded=s.seeded||['pionova'];if(!WS.seeded.includes('cranes')){const i=WS.list.findIndex(w=>/pionova/i.test(w.M.name||''));WS.list.splice(i+1,0,newWs(SAMPLE(),null,'SAMPLE'));WS.seeded.push('cranes');}
+      return;}}catch(e){}
+  const a=newWs(PIONOVA(),PIONOVA_SC(),'SAMPLE'),c=newWs(SAMPLE(),null,'SAMPLE'),b=newWs(BLANK());WS.list=[a,c,b];WS.active=a.id;WS.seeded=['pionova','cranes'];}
 function useWs(){const w=curWs();M=w.M;SC=w.SC;SNAPS=w.SNAPS;RES=w.RES||null;SEL=null;}
 loadWs();useWs();
 const nodeById=id=>M.nodes.find(n=>n.id===id);
