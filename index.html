@@ -1,0 +1,1235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlowTwin Process Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#131318; --panel:#1b1b22; --panel2:#23232c; --panel3:#2b2b36; --line:#34343f; --line2:#44444f;
+  --ink:#ececf1; --muted:#a2a2b3; --dim:#74748a;
+  --accent:#ff7a45; --accent2:#ff9a6e; --good:#3ecf8e; --warn:#f5b83d; --bad:#ff5c63; --blue:#5fb0c9; --violet:#9b7bff;
+  --mono:'JetBrains Mono',ui-monospace,monospace; --sans:Inter,system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink)}
+.app{display:grid;grid-template-rows:52px 40px 1fr;height:100vh}
+
+/* ---------- top bar ---------- */
+.top{display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;font:700 15px var(--mono);letter-spacing:.3px;white-space:nowrap}
+.brand .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#ff4f7a);display:grid;place-items:center}
+.modelname{background:transparent;border:1px solid transparent;border-radius:6px;padding:5px 8px;color:var(--muted);width:230px}
+.modelname:hover,.modelname:focus{border-color:var(--line2);outline:none;color:var(--ink)}
+.tabs{display:flex;gap:2px;background:var(--bg);padding:3px;border-radius:9px;border:1px solid var(--line)}
+.tabs button{background:none;border:0;padding:6px 14px;border-radius:7px;color:var(--muted);font-weight:500}
+.tabs button.on{background:var(--panel3);color:var(--ink)}
+.sp{flex:1}
+.btn{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:7px 12px;font-weight:500;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.btn:hover{background:var(--panel3)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#1a0d06;font-weight:600}
+.btn.pri:hover{background:var(--accent2)}
+.btn.sm{padding:4px 9px;font-size:12.5px;border-radius:7px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);background:var(--panel2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.progress{width:120px;height:6px;background:var(--panel3);border-radius:4px;overflow:hidden;display:none}
+.progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .1s}
+
+.view{display:none;min-height:0}
+.view.on{display:grid}
+
+/* ---------- model view ---------- */
+#v-model.on{display:block;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+.workarea{display:grid;grid-template-columns:56px 1fr 360px;height:calc(100vh - 92px);min-height:520px}
+#results{padding:26px 26px 60px;border-top:1px solid var(--line);background:var(--bg)}
+.wstabs{display:flex;align-items:flex-end;gap:3px;padding:0 10px;background:#0f0f13;border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden}
+.wstab{display:flex;align-items:center;gap:6px;padding:0 6px 0 14px;height:32px;border:1px solid var(--line);border-bottom:0;border-radius:9px 9px 0 0;background:var(--panel);color:var(--muted);font-size:12.5px;max-width:240px;cursor:pointer;flex:none;position:relative;top:1px}
+.wstab:hover{color:var(--ink)}
+.wstab.on{background:var(--panel2);color:var(--ink);border-color:var(--line2);z-index:1}
+.wstab.on::before{content:'';position:absolute;left:0;right:0;top:-1px;height:2px;background:var(--accent);border-radius:9px 9px 0 0}
+.wstab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wstab .tg{font-size:9.5px;font-weight:700;letter-spacing:.5px;background:var(--panel3);color:var(--muted);padding:1px 5px;border-radius:4px}
+.wsadd{height:28px;width:30px;border:0;background:transparent;color:var(--muted);border-radius:7px;font-size:18px;margin-bottom:3px;flex:none}
+.wsadd:hover{background:var(--panel2);color:var(--ink)}
+.emptyws{position:absolute;inset:0;display:none;place-items:center;pointer-events:none}
+.emptyws.on{display:grid}
+.emptyws>div{pointer-events:auto;text-align:center;max-width:430px;padding:26px 28px;background:rgba(27,27,34,.94);border:1px dashed var(--line2);border-radius:14px}
+.emptyws h3{margin:0 0 6px}.emptyws p{color:var(--muted);margin:0 0 16px;font-size:13px}
+.emptyws .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.resready{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:none;background:var(--accent);color:#1a0d06;border:0;border-radius:20px;padding:8px 16px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:5}
+.resready.on{display:block}
+.help{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;background:var(--panel3);color:var(--muted);font:600 11px var(--sans);margin-left:7px;cursor:help;position:relative;vertical-align:1px;text-transform:none;letter-spacing:0}
+.help:hover{background:var(--accent);color:#1a0d06}
+.help:hover::after{content:attr(data-tip);position:absolute;left:-8px;top:24px;width:290px;background:#000;color:#ececf1;border:1px solid var(--line2);padding:9px 11px;border-radius:8px;font:400 12px/1.5 var(--sans);z-index:60;white-space:normal;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.kpi .help:hover::after{width:240px}
+.help.flip:hover::after{left:auto;right:-8px}
+.ins{margin:12px 0 0;padding-top:10px;border-top:1px solid #2a2a33;font-size:12.5px;color:#dcdce6;line-height:1.5}
+.ins b.il{color:var(--accent);font-weight:600;margin-right:4px}
+.rail{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:6px}
+.rail button{width:40px;height:40px;border-radius:10px;border:1px solid transparent;background:transparent;display:grid;place-items:center;color:var(--muted);position:relative}
+.rail button:hover{background:var(--panel2);color:var(--ink);border-color:var(--line)}
+.rail button[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:48px;top:50%;transform:translateY(-50%);background:#000;color:#fff;padding:5px 9px;border-radius:6px;font-size:12px;white-space:nowrap;z-index:50}
+.rail hr{width:26px;border:0;border-top:1px solid var(--line);margin:4px 0}
+
+.canvas{position:relative;overflow:hidden;background-color:#17171d;
+  background-image:radial-gradient(circle,#34343f 1px,transparent 1.2px);background-size:48px 48px;cursor:grab}
+.canvas.panning{cursor:grabbing}
+#world{position:absolute;left:0;top:0;transform-origin:0 0}
+#edges{position:absolute;left:0;top:0;width:10px;height:10px;overflow:visible;pointer-events:none}
+#edges path.hit{stroke:transparent;stroke-width:16;fill:none;pointer-events:stroke;cursor:pointer}
+#edges path.ln{fill:none;stroke:#6b6b80;stroke-width:2}
+#edges g.edge.win path.ln{stroke:#3ecf8e}
+#edges g.edge.loss path.ln{stroke:#ff5c63;stroke-dasharray:6 5}
+#edges g.edge.rework path.ln{stroke:#f5b83d;stroke-dasharray:3 5}
+#edges g.edge.sel path.ln{stroke:var(--accent)!important}
+#edges g.edge:hover path.ln{stroke:#b9b9cc}
+#edges .elab rect{fill:#23232c;stroke:#3d3d4a}
+#edges g.edge.sel .elab rect{stroke:var(--accent)}
+#edges .elab text{fill:#cfcfdc;font:500 11px var(--sans)}
+#edges .elab text.p{font:700 11px var(--mono);fill:#fff}
+#edges .tmp{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4}
+#tokens{position:absolute;left:0;top:0;width:10px;height:10px;overflow:visible;pointer-events:none}
+
+.node{position:absolute;width:232px;background:var(--panel2);border:1.5px solid #3b3b48;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.35);user-select:none;cursor:pointer}
+.node:hover{border-color:#5a5a6c}
+.node.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,122,69,.18),0 6px 18px rgba(0,0,0,.35)}
+.node .nh{display:flex;align-items:center;gap:9px;padding:10px 11px 8px}
+.node .ico{width:32px;height:32px;border-radius:9px;background:var(--c);display:grid;place-items:center;flex:none;color:#111}
+.node .ico svg{width:18px;height:18px}
+.node .nt{font-weight:600;font-size:13.5px;line-height:1.2}
+.node .ns{font-size:11.5px;color:var(--muted)}
+.node .tk{display:flex;flex-wrap:wrap;gap:4px;padding:0 11px 9px}
+.node .tk span{font-size:11px;background:#2f2f3b;color:#cfcfdc;border-radius:5px;padding:2px 6px}
+.node .nf{border-top:1px solid #34343f;padding:7px 11px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+.node .ub{flex:1;height:5px;background:#34343f;border-radius:3px;overflow:hidden}
+.node .ub i{display:block;height:100%;width:0;background:var(--good);transition:width .25s}
+.node .port{position:absolute;top:26px;width:14px;height:14px;border-radius:50%;background:#1b1b22;border:2px solid #7a7a90}
+.node .port.in{left:-8px}
+.node .port.out{right:-8px;cursor:crosshair}
+.node .port.out:hover{background:var(--accent);border-color:var(--accent)}
+.node.source{border-radius:26px 12px 12px 26px}
+.node.outcome{width:200px;border-radius:12px 26px 26px 12px}
+.node .flag{position:absolute;top:-11px;right:10px;font:700 10px var(--mono);letter-spacing:.5px;padding:3px 7px;border-radius:5px;background:var(--bad);color:#fff;display:none}
+.node.bneck .flag{display:block}
+.node.heat-g{border-color:#2f7f5d}.node.heat-a{border-color:#b8872b}.node.heat-r{border-color:#c2424a}
+.node .live{position:absolute;top:-10px;left:12px;display:none;gap:4px}
+.node .live b{font:700 10px var(--mono);padding:2px 6px;border-radius:5px;background:#000;color:#fff}
+.node .live b.q{background:#8a3341}
+.node .live b.a{background:#1c6e68}
+.node .live b.w{background:#444}
+.live-on .node .live{display:flex}
+
+.hud{position:absolute;left:14px;top:12px;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;pointer-events:none}
+.hud>div{background:rgba(27,27,34,.92);border:1px solid var(--line);border-radius:10px;padding:7px 12px;pointer-events:auto}
+.hud .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.hud .v{font:700 16px var(--mono)}
+.hud-ctl{display:flex;align-items:center;gap:10px}
+.hud-ctl input[type=range]{width:110px;accent-color:var(--accent)}
+.legend{position:absolute;left:14px;bottom:12px;display:flex;gap:14px;font-size:11.5px;color:var(--muted);background:rgba(27,27,34,.9);border:1px solid var(--line);border-radius:9px;padding:6px 11px}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.zoomctl{position:absolute;right:14px;bottom:12px;display:flex;gap:4px}
+.tip0{position:absolute;right:14px;top:12px;max-width:300px;font-size:12px;color:var(--muted);background:rgba(27,27,34,.92);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.tip0 b{color:var(--ink)}
+
+/* ---------- inspector ---------- */
+.insp{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:0 0 40px}
+.insp h3{margin:0;font-size:15px}
+.ih{position:sticky;top:0;z-index:2;background:var(--panel);padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.ih .ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#111;flex:none}
+.ih .ico svg{width:17px;height:17px}
+.ih small{display:block;color:var(--muted);font-size:11.5px}
+.sec{padding:12px 16px;border-bottom:1px solid var(--line)}
+.sec>.st{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 9px;display:flex;align-items:center;gap:8px}
+.sec>.st .btn{margin-left:auto;text-transform:none;letter-spacing:0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.f{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);position:relative;min-width:0}
+.f.full{grid-column:1/-1}
+.f>span i{font-style:normal;display:inline-grid;place-items:center;width:14px;height:14px;border-radius:50%;background:var(--panel3);font-size:9.5px;margin-left:3px;cursor:help}
+.f input,.f select,.f textarea{background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:6px 8px;width:100%;min-width:0;font-size:13px}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--accent)}
+.f em{position:absolute;right:8px;bottom:7px;font-style:normal;font-size:11px;color:var(--dim);pointer-events:none}
+.f.rg input{padding:0;accent-color:var(--accent)}
+.f.rg b{color:var(--ink);font:600 11.5px var(--mono);margin-left:4px}
+.chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+.chk input,.f .chk input{accent-color:var(--accent);width:auto;padding:0}
+.f .chk{flex-direction:row}
+.roles{width:100%;border-collapse:collapse;font-size:12.5px}
+.roles th{font-size:10.5px;color:var(--dim);font-weight:600;text-align:left;padding:0 4px 4px;text-transform:uppercase;letter-spacing:.5px}
+.roles td{padding:2px}
+.roles input{background:var(--bg);border:1px solid var(--line2);border-radius:6px;padding:5px 6px;width:100%;font-size:12.5px}
+.roles input:focus{outline:none;border-color:var(--accent)}
+.x{background:none;border:0;color:var(--dim);font-size:16px;line-height:1;padding:2px 5px;border-radius:5px}
+.x:hover{color:var(--bad);background:var(--panel2)}
+details.task{border:1px solid var(--line2);border-radius:9px;margin-bottom:8px;background:var(--panel2)}
+details.task>summary{list-style:none;padding:8px 10px;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;font-size:13px}
+details.task>summary::-webkit-details-marker{display:none}
+details.task>summary .rec{margin-left:auto;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}
+details.task[open]>summary{border-bottom:1px solid var(--line2)}
+details.task .tb{padding:10px}
+.sub{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin:12px 0 6px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:12.5px}
+.kv span{color:var(--muted)} .kv b{font:600 12.5px var(--mono);text-align:right}
+.warnbox{font-size:12px;border-left:3px solid var(--warn);background:rgba(245,184,61,.08);padding:7px 10px;border-radius:0 7px 7px 0;color:#f3dca6;margin-top:8px}
+.infobox{font-size:12px;border-left:3px solid var(--blue);background:rgba(95,176,201,.08);padding:7px 10px;border-radius:0 7px 7px 0;color:#bfe0ea}
+.empty{padding:26px 18px;color:var(--muted);font-size:13px}
+.empty h4{color:var(--ink);margin:0 0 8px;font-size:14px}
+.empty ol{padding-left:18px;margin:8px 0} .empty li{margin:5px 0}
+.pill{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}
+.p-auto{background:rgba(62,207,142,.16);color:#6fe3ae}
+.p-aug{background:rgba(95,176,201,.16);color:#8fd0e4}
+.p-hum{background:rgba(155,123,255,.16);color:#bba6ff}
+.p-bad{background:rgba(255,92,99,.16);color:#ff8f94}
+.p-warn{background:rgba(245,184,61,.16);color:#f5c96a}
+.p-ok{background:rgba(62,207,142,.16);color:#6fe3ae}
+
+/* ---------- scenario + insights ---------- */
+.page{overflow:auto;padding:22px 26px 60px}
+.page h2{margin:0 0 4px;font-size:21px}
+.page .lead{color:var(--muted);margin:0 0 18px;max-width:900px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.card h4{margin:0 0 3px;font-size:14px}
+.card .cs{color:var(--muted);font-size:12px;margin:0 0 10px}
+.c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
+.kpi .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.kpi .v{font:700 24px var(--mono);margin:4px 0 2px}
+.kpi .r{font-size:11.5px;color:var(--dim)}
+.chartbox{position:relative;height:250px}
+.chartbox.tall{height:320px}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.t td{padding:7px 8px;border-bottom:1px solid #2a2a33;vertical-align:top}
+table.t td.n{font-family:var(--mono);text-align:right;white-space:nowrap}
+table.t th.n{text-align:right}
+table.t tr:hover td{background:#1f1f27}
+.bar{height:6px;border-radius:3px;background:var(--panel3);overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%}
+.finding{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #2a2a33}
+.finding:last-child{border-bottom:0}
+.finding .fi{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;font-weight:700}
+.finding p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.nores{display:grid;place-items:center;min-height:60vh;text-align:center;color:var(--muted)}
+.nores h3{color:var(--ink)}
+.scgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px 18px}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.presets .btn.on{border-color:var(--accent);color:var(--accent)}
+select.mini{background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:4px 8px;font-size:12.5px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:#000;border:1px solid var(--line2);padding:9px 16px;border-radius:9px;font-size:13px;transition:.25s;z-index:100;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.foot{color:var(--dim);font-size:11.5px;margin-top:18px}
+@media (max-width:1100px){.c3{grid-column:span 6}.c4,.c5,.c6,.c7,.c8{grid-column:span 12}.workarea{grid-template-columns:56px 1fr 320px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="mk"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 6h9M6.3 8.2 10.7 16M17.7 8.2 13.3 16"/></svg></span>FlowTwin</div>
+    <input class="modelname" id="modelName" title="Rename this workspace">
+    <nav class="tabs" id="tabs">
+      <button data-v="model" class="on">Workflow & insights</button>
+      <button data-v="scenario">Assumptions</button>
+    </nav>
+    <div class="sp"></div>
+    <div class="progress" id="prog"><i></i></div>
+    <button class="btn" id="btnShare" title="Copy a link that opens this workspace for anyone"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="m8.3 10.8 7.4-4.3M8.3 13.2l7.4 4.3"/></svg>Share</button>
+    <button class="btn pri" id="btnRun" title="Monte Carlo simulation (200 years) + live animation of one year"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>Run simulation</button>
+  </header>
+  <nav class="wstabs" id="wstabs"></nav>
+
+  <main class="view on" id="v-model">
+   <div class="workarea">
+    <aside class="rail">
+      <button data-add="source" data-tip="Add input (demand source)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h11M10 8l4 4-4 4"/><path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/></svg></button>
+      <button data-add="dept" data-tip="Add department"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.5a3 3 0 0 1 0 5.6M18 14.5c1.9.8 3 2.8 3 5.5"/></svg></button>
+      <button data-add="outcome" data-tip="Add outcome (revenue / lost)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></button>
+      <hr>
+      <button id="btnFit" data-tip="Fit to screen"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button id="btnDel" data-tip="Delete selected (Del)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+      <hr>
+      <button id="btnSample" data-tip="Open the crane sample in a new tab"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21h16M6 21V5l12 2M6 5h14M17 7v6"/><path d="M15 13h4v3h-4z"/></svg></button>
+      <button id="btnBlank" data-tip="New empty workspace tab"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></svg></button>
+      <button id="btnExport" data-tip="Export model (JSON)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg></button>
+      <button id="btnImport" data-tip="Import model (JSON)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></svg></button>
+      <input type="file" id="fileIn" accept=".json" hidden>
+    </aside>
+
+    <section class="canvas" id="canvas">
+      <div id="world">
+        <svg id="edges"></svg>
+        <div id="nodes"></div>
+        <svg id="tokens"></svg>
+      </div>
+      <div class="hud" id="hud" style="display:none">
+        <div class="hud-ctl">
+          <button class="btn sm" id="liveToggle">Pause</button>
+          <button class="btn sm" id="liveStop">Stop</button>
+          <label style="font-size:11.5px;color:var(--muted)">Speed <input type="range" id="liveSpeed" min="1" max="60" value="12"></label>
+          <span style="font:600 11.5px var(--mono)" id="liveSpeedV">12 d/s</span>
+        </div>
+        <div><div class="k">Sim date</div><div class="v" id="hDay">–</div></div>
+        <div><div class="k">Revenue</div><div class="v" id="hRev">–</div></div>
+        <div><div class="k">Won / delivered</div><div class="v" id="hWon">–</div></div>
+        <div><div class="k">Work in progress</div><div class="v" id="hWip">–</div></div>
+        <div><div class="k">Lost / no-bid</div><div class="v" id="hLost">–</div></div>
+      </div>
+      <div class="tip0" id="tip0"><b>How to build:</b> add departments from the left rail, drag from a node's <b>right port</b> onto another node to connect, then click any node or line to edit its attributes. <b>Ctrl/⌘ + scroll</b> or pinch to zoom, drag the background to pan. Press <b>Run simulation</b> — insights appear below the workflow.</div>
+      <div class="emptyws" id="emptyWs"><div><h3>Empty workspace</h3><p>Map your own business: add the <b>inputs</b> that bring work in, the <b>departments</b> that do it, and the <b>outcomes</b> where it ends — then connect them.</p>
+        <div class="row"><button class="btn sm" data-add="source">+ Input</button><button class="btn sm" data-add="dept">+ Department</button><button class="btn sm" data-add="outcome">+ Outcome</button></div></div></div>
+      <button class="resready" id="resReady">Insights ready ↓</button>
+      <div class="legend"><span><i style="border-color:#8a8aa0"></i>handoff</span><span><i style="border-color:#3ecf8e"></i>win</span><span><i style="border-color:#ff5c63;border-top-style:dashed"></i>loss</span><span><i style="border-color:#f5b83d;border-top-style:dotted"></i>rework</span><span style="color:var(--dim)">line width = flow volume after a run</span></div>
+      <div class="zoomctl"><button class="btn sm" id="zOut">−</button><button class="btn sm" id="zIn">+</button></div>
+    </section>
+
+    <aside class="insp" id="insp"></aside>
+   </div>
+   <section id="results"></section>
+  </main>
+
+  <main class="view page" id="v-scenario"></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Utilities
+   ===================================================================== */
+const $=(s,el=document)=>el.querySelector(s);
+const $$=(s,el=document)=>[...el.querySelectorAll(s)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const uid=p=>p+'_'+Math.random().toString(36).slice(2,8);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+function fmt$(v){const a=Math.abs(v),s=v<0?'−':'';if(a>=1e9)return s+'$'+(a/1e9).toFixed(2)+'B';if(a>=1e6)return s+'$'+(a/1e6).toFixed(a>=1e8?0:a>=1e7?1:2)+'M';if(a>=1e3)return s+'$'+(a/1e3).toFixed(0)+'k';return s+'$'+a.toFixed(0);}
+const fmtN=(v,d=0)=>Number(v).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const pct=(v,d=0)=>(v*100).toFixed(d)+'%';
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('on'),2600);}
+function quant(arr,q){if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);const i=(s.length-1)*q,lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo);}
+const mean=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0;
+const START=new Date(2027,0,1);
+const dayLabel=d=>{const t=new Date(START.getTime()+Math.floor(d)*864e5);return t.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+
+/* seeded RNG + distributions */
+function rngFactory(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function normal(r){let u=0;while(u===0)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());}
+function poisson(r,l){if(l<=0)return 0;if(l>30)return Math.max(0,Math.round(l+Math.sqrt(l)*normal(r)));const L=Math.exp(-l);let k=0,p=1;do{k++;p*=r();}while(p>L);return k-1;}
+function tri(r,a,m,b){a=+a;m=+m;b=+b;if(!(b>a))return Math.max(0,a);m=clamp(m,a,b);const u=r(),c=(m-a)/(b-a);return u<c?a+Math.sqrt(u*(b-a)*(m-a)):b-Math.sqrt((1-u)*(b-a)*(b-m));}
+function lognorm(r,mean,cvPct){const cv=cvPct/100;if(cv<=0||mean<=0)return mean;const s2=Math.log(1+cv*cv);return Math.exp(Math.log(mean)-s2/2+Math.sqrt(s2)*normal(r));}
+
+/* =====================================================================
+   Sample model — Atlas Cranes (illustrative assumptions, not real data)
+   ===================================================================== */
+const AI=(rep,judg,data,client,phys)=>({rep,judg,data,client,phys});
+function T(id,name,eMin,eMode,eMax,o={}){return Object.assign({id,name,eMin,eMode,eMax,wait:0,rework:0,material:0,maxWait:0,supply:false,aiMode:'off',ai:AI(5,5,5,5,0)},o);}
+function SAMPLE(){return{
+  name:'Atlas Cranes — sample model',
+  nodes:[
+    {id:'src_tender',type:'source',x:0,y:150,name:'Tenders & RFQs',color:'#5fb0c9',rate:12,cv:25,seasonAmp:25,peakMonth:4,growth:8,avgValue:1800000,valueSpread:30,
+      note:'Public and private crane tenders reaching the sales inbox.'},
+    {id:'src_service',type:'source',x:0,y:760,name:'Service & Parts Requests',color:'#5fb0c9',rate:32,cv:15,seasonAmp:10,peakMonth:10,growth:5,avgValue:18000,valueSpread:50,
+      note:'Aftermarket repair, inspection and spare-parts orders from the installed base.'},
+    {id:'sales',type:'dept',x:330,y:130,name:'Sales',color:'#ff7a45',manager:{name:'Sales Director',salary:185000},
+      roles:[{role:'Account Manager',fte:4,salary:110000},{role:'Bid Coordinator',fte:1,salary:78000}],
+      hoursPerDay:8,productive:80,wip:8,weekends:false,overhead:9000,
+      tasks:[T('qualify','Qualify tender',3,6,12,{maxWait:10,ai:AI(8,4,8,2,0)}),
+             T('draft','Write proposal',16,30,60,{rework:5,ai:AI(7,5,7,3,0)}),
+             T('submit','Submit & negotiate',8,16,40,{wait:21,ai:AI(3,8,5,9,0)})]},
+    {id:'eng',type:'dept',x:710,y:130,name:'Engineering',color:'#9b7bff',manager:{name:'Chief Engineer',salary:170000},
+      roles:[{role:'Mechanical Engineer',fte:4,salary:125000},{role:'Electrical Engineer',fte:2,salary:118000},{role:'Draftsperson',fte:3,salary:82000}],
+      hoursPerDay:8,productive:75,wip:6,weekends:false,overhead:14000,
+      tasks:[T('validate','Validate & cost proposal',20,40,80,{rework:12,maxWait:14,ai:AI(6,6,8,2,0)}),
+             T('design','Detailed design',160,260,420,{rework:8,ai:AI(4,8,8,3,0)})]},
+    {id:'fin',type:'dept',x:1090,y:470,name:'Finance & Accounting',color:'#3ecf8e',manager:{name:'CFO',salary:175000},
+      roles:[{role:'Accountant',fte:1,salary:88000},{role:'AR / AP Clerk',fte:1,salary:60000}],
+      hoursPerDay:8,productive:75,wip:10,weekends:false,overhead:4000,
+      tasks:[T('contract','Contract, credit & budget',4,8,16,{ai:AI(6,6,8,4,0)}),
+             T('invoice','Final invoice & collection',4,6,12,{wait:30,ai:AI(9,2,9,3,0)}),
+             T('svcinv','Service invoicing',1,1.5,3,{ai:AI(10,1,10,1,0)})]},
+    {id:'ops',type:'dept',x:1090,y:130,name:'Operations Planning',color:'#f5b83d',manager:{name:'Ops Manager',salary:140000},
+      roles:[{role:'Production Planner',fte:1,salary:90000},{role:'Buyer',fte:1,salary:85000}],
+      hoursPerDay:8,productive:80,wip:6,weekends:false,overhead:3000,
+      tasks:[T('plan','Plan & procure materials',30,50,90,{wait:21,supply:true,ai:AI(7,5,7,3,0)})]},
+    {id:'fab',type:'dept',x:1470,y:130,name:'Factory — Fabrication Line',color:'#dd594e',manager:{name:'Line Supervisor',salary:95000},
+      roles:[{role:'Welder',fte:14,salary:72000},{role:'Fitter',fte:7,salary:70000}],
+      hoursPerDay:8,productive:85,wip:3,weekends:false,overhead:42000,
+      tasks:[T('fabricate','Fabricate structure',600,900,1400,{material:800000,rework:3,ai:AI(7,3,3,0,9)})]},
+    {id:'asm',type:'dept',x:1850,y:130,name:'Factory — Assembly & Test',color:'#e28083',manager:{name:'Assembly Supervisor',salary:95000},
+      roles:[{role:'Assembly Technician',fte:10,salary:78000}],
+      hoursPerDay:8,productive:85,wip:2,weekends:false,overhead:18000,
+      tasks:[T('assemble','Assemble & load test',300,450,700,{material:350000,ai:AI(6,4,4,0,8)})]},
+    {id:'log',type:'dept',x:1850,y:470,name:'Logistics & Commissioning',color:'#1c9e8f',manager:{name:'Site Manager',salary:110000},
+      roles:[{role:'Field Technician',fte:3,salary:85000}],
+      hoursPerDay:8,productive:80,wip:3,weekends:false,overhead:6000,
+      tasks:[T('deliver','Ship, install & commission',80,120,200,{wait:7,material:40000,ai:AI(3,6,4,5,9)})]},
+    {id:'svc',type:'dept',x:710,y:760,name:'Aftermarket Service',color:'#5fb0c9',manager:{name:'Service Manager',salary:105000},
+      roles:[{role:'Service Technician',fte:6,salary:80000},{role:'Service Coordinator',fte:1,salary:62000}],
+      hoursPerDay:8,productive:80,wip:10,weekends:false,overhead:7000,
+      tasks:[T('service','Diagnose & repair',8,16,40,{material:6000,maxWait:20,ai:AI(5,6,5,6,7)})]},
+    {id:'o_nobid',type:'outcome',x:360,y:-150,name:'No-bid / disqualified',kind:'lost',realize:0,color:'#74748a'},
+    {id:'o_lost',type:'outcome',x:740,y:-150,name:'Lost to competitor',kind:'lost',realize:0,color:'#ff5c63'},
+    {id:'o_crane',type:'outcome',x:1480,y:560,name:'Crane delivered',kind:'revenue',realize:100,color:'#3ecf8e'},
+    {id:'o_svc',type:'outcome',x:1480,y:800,name:'Service revenue',kind:'revenue',realize:100,color:'#3ecf8e'},
+  ],
+  edges:[
+    E('src_tender','arrival','sales','qualify',{label:'New tender',priority:3,importance:4}),
+    E('sales','qualify','sales','draft',{prob:65,label:'Go — bid',importance:3}),
+    E('sales','qualify','o_nobid','',{prob:35,type:'loss',label:'No-bid'}),
+    E('sales','draft','eng','validate',{label:'Validate & cost',priority:5,importance:5,cost:150}),
+    E('eng','validate','sales','submit',{label:'Costed proposal',priority:5,importance:5}),
+    E('sales','submit','fin','contract',{prob:32,type:'win',label:'Won — sign contract',priority:5,importance:5,cost:2500}),
+    E('sales','submit','o_lost','',{prob:68,type:'loss',label:'Lost'}),
+    E('fin','contract','eng','design',{label:'Budget released',priority:3,importance:5}),
+    E('eng','design','ops','plan',{label:'Released drawings',priority:3,importance:4,delay:1}),
+    E('ops','plan','fab','fabricate',{label:'Work order + steel',priority:3,importance:4}),
+    E('fab','fabricate','asm','assemble',{label:'Structure',priority:3,importance:4,delay:2,cost:4000}),
+    E('asm','assemble','log','deliver',{prob:92,label:'Passed load test',priority:3,importance:4}),
+    E('asm','assemble','fab','fabricate',{prob:8,type:'rework',label:'Failed test — rework',priority:5,importance:5}),
+    E('log','deliver','fin','invoice',{label:'Signed acceptance',priority:3,importance:4}),
+    E('fin','invoice','o_crane','',{label:'Cash in',importance:5}),
+    E('src_service','arrival','svc','service',{label:'Service ticket',priority:3,importance:3}),
+    E('svc','service','fin','svcinv',{label:'Job sheet',priority:2,importance:2}),
+    E('fin','svcinv','o_svc','',{label:'Paid',importance:2}),
+  ]};}
+function E(from,fromTask,to,toTask,o={}){return Object.assign({id:uid('e'),from,fromTask,to,toTask,prob:100,type:'normal',label:'',delay:0,cost:0,priority:3,importance:3},o);}
+const DEFAULT_SC=()=>({preset:'Baseline',demand:0,winShift:0,leadLoss:0,price:0,material:0,salaryInfl:0,absent:4,reworkMult:1,supplyDelay:0,
+  gaHead:4,gaCost:950000,aiSeat:60,aiAutomate:900,augRed:30,autoRed:65,runs:200,seed:42});
+
+/* =====================================================================
+   State + persistence
+   ===================================================================== */
+let M, SC, RES=null, SNAPS=[], SEL=null;
+/* Workspaces = browser-style tabs, each with its own model, assumptions and saved scenarios */
+const WS={list:[],active:null};
+const curWs=()=>WS.list.find(w=>w.id===WS.active);
+const BLANK=()=>({name:'New workspace',nodes:[],edges:[]});
+function newWs(model,sc,tag){return{id:uid('ws'),M:model,SC:sc||DEFAULT_SC(),SNAPS:[],tag:tag||''};}
+function persist(){try{localStorage.setItem('flowtwin.v2',JSON.stringify({active:WS.active,list:WS.list.map(w=>({id:w.id,M:w.M,SC:w.SC,SNAPS:w.SNAPS,tag:w.tag}))}));}catch(e){}}
+function save(){const w=curWs();if(w){w.M=M;w.SC=SC;w.SNAPS=SNAPS;w.RES=RES;}persist();renderWsTabs();}
+function loadWs(){
+  try{const s=JSON.parse(localStorage.getItem('flowtwin.v2')||'null');
+    if(s&&s.list&&s.list.length){WS.list=s.list.map(w=>({...w,SC:Object.assign(DEFAULT_SC(),w.SC||{}),SNAPS:w.SNAPS||[]}));WS.active=s.active;if(!curWs())WS.active=WS.list[0].id;return;}}catch(e){}
+  const a=newWs(SAMPLE(),null,'SAMPLE'),b=newWs(BLANK());WS.list=[a,b];WS.active=a.id;}
+function useWs(){const w=curWs();M=w.M;SC=w.SC;SNAPS=w.SNAPS;RES=w.RES||null;SEL=null;}
+loadWs();useWs();
+const nodeById=id=>M.nodes.find(n=>n.id===id);
+const taskOf=(n,tid)=>n&&n.tasks?n.tasks.find(t=>t.id===tid):null;
+
+/* =====================================================================
+   Derived per-department economics
+   ===================================================================== */
+function deptEcon(n,sc){
+  const fte=n.roles.reduce((s,r)=>s+(+r.fte||0),0);
+  const pay=(n.roles.reduce((s,r)=>s+(+r.fte||0)*(+r.salary||0),0)+(n.manager&&n.manager.name?+n.manager.salary||0:0))*(1+sc.salaryInfl/100);
+  const head=fte+(n.manager&&n.manager.name?1:0);
+  const capDay=fte*(+n.hoursPerDay||0)*(+n.productive||0)/100*(1-sc.absent/100);
+  const workDays=n.weekends?365:261;
+  const capYear=capDay*workDays;
+  const anyAug=n.tasks.some(t=>t.aiMode==='augment');
+  const nAuto=n.tasks.filter(t=>t.aiMode==='automate').length;
+  const ai=(anyAug?sc.aiSeat*fte*12:0)+nAuto*sc.aiAutomate*12;
+  const rate=capYear>0?pay/capYear:0; // fully loaded $ per productive hour
+  return{fte,pay,head,capDay,capYear,ai,rate,overhead:(+n.overhead||0)*12};
+}
+function aiScore(t){const a=t.ai;let s=(0.30*a.rep+0.25*a.data+0.25*(10-a.judg)+0.20*(10-a.client))*10;s*=1-0.9*a.phys/10;return Math.round(clamp(s,0,100));}
+function aiRec(s){return s>=65?['Automate','p-auto']:s>=40?['Augment (copilot)','p-aug']:['Keep human','p-hum'];}
+
+/* =====================================================================
+   Simulation engine — discrete-time (daily), Monte Carlo capable
+   ===================================================================== */
+function prepare(model,sc){
+  const nodes={};model.nodes.forEach(n=>nodes[n.id]=n);
+  const groups={};
+  model.edges.forEach(e=>{if(!nodes[e.from]||!nodes[e.to])return;const k=e.from+'|'+(nodes[e.from].type==='source'?'arrival':e.fromTask);(groups[k]=groups[k]||[]).push(e);});
+  const routes={};
+  for(const k in groups){
+    const es=groups[k];let tot=es.reduce((s,e)=>s+Math.max(0,+e.prob||0),0);
+    let ps=es.map(e=>tot>0?Math.max(0,+e.prob||0)/tot:1/es.length);
+    // rework multiplier
+    const rw=es.map(e=>e.type==='rework');
+    if(sc.reworkMult!==1&&rw.some(Boolean)){const r0=ps.reduce((s,p,i)=>s+(rw[i]?p:0),0);const r1=clamp(r0*sc.reworkMult,0,0.95);const f=r0>0?r1/r0:0,g=(1-r0)>0?(1-r1)/(1-r0):0;ps=ps.map((p,i)=>rw[i]?p*f:p*g);}
+    // win-rate shift
+    const win=es.map(e=>e.type==='win'),loss=es.map(e=>e.type==='loss');
+    if(sc.winShift&&win.some(Boolean)&&loss.some(Boolean)){const w=ps.reduce((s,p,i)=>s+(win[i]?p:0),0),l=ps.reduce((s,p,i)=>s+(loss[i]?p:0),0);const nw=clamp(w+sc.winShift/100,0,w+l);ps=ps.map((p,i)=>win[i]?(w>0?p*nw/w:0):loss[i]?(l>0?p*(w+l-nw)/l:0):p);}
+    routes[k]=es.map((e,i)=>({e,p:ps[i]}));
+  }
+  // probability that a job at (node|task) ends as revenue → expected value of a lost lead
+  const P={};model.nodes.forEach(n=>{if(n.type==='outcome')P[n.id+'|']=n.kind==='revenue'?(+n.realize||0)/100:0;});
+  const keyOf=(nid,tid)=>{const n=nodes[nid];if(!n)return'';if(n.type==='outcome')return nid+'|';if(n.type==='source')return nid+'|arrival';return nid+'|'+(tid||(n.tasks[0]&&n.tasks[0].id));};
+  for(let it=0;it<80;it++){for(const k in routes){P[k]=routes[k].reduce((s,x)=>s+x.p*(P[keyOf(x.e.to,x.e.toTask)]||0),0);}}
+  return{nodes,routes,P,keyOf};
+}
+
+class Sim{
+  constructor(model,sc,opt){
+    this.m=model;this.sc=sc;this.r=rngFactory(opt.seed||1);this.T=opt.days;this.W=opt.warmup||0;this.d=0;this.vis=opt.visual||null;this.series=!!opt.series;
+    Object.assign(this,prepare(model,sc));
+    this.sources=model.nodes.filter(n=>n.type==='source').map(n=>({n,month:-1,mf:1}));
+    this.depts=model.nodes.filter(n=>n.type==='dept');
+    this.ns={};this.econ={};
+    for(const n of this.depts){this.econ[n.id]=deptEcon(n,sc);
+      this.ns[n.id]={q:[],act:[],waits:[],hAvail:0,hWork:0,qSum:0,qMax:0,waitSum:0,waitN:0,done:0,drops:0,dropVal:0,dropExp:0,material:0,reworks:0,taskHours:{},wq:[],wacc:0,backStart:null,todayUtil:0};
+      n.tasks.forEach(t=>this.ns[n.id].taskHours[t.id]=0);}
+    this.transit=[];this.jobSeq=0;
+    this.o={revenue:0,revBySrc:{},won:0,outcomes:{},lostExt:0,lostExtVal:0,cycle:{},handoff:0,edgeFlow:{},unrouted:0,wipNow:0,lostAll:0};
+    model.nodes.forEach(n=>{if(n.type==='source'){this.o.revBySrc[n.id]=0;this.o.cycle[n.id]=[];}if(n.type==='outcome')this.o.outcomes[n.id]=0;});
+  }
+  get inW(){return this.d>=this.W;}
+  aiF(t){return t.aiMode==='augment'?1-this.sc.augRed/100:t.aiMode==='automate'?1-this.sc.autoRed/100:1;}
+  meanEff(t){return((+t.eMin)+(+t.eMode)+(+t.eMax))/3*this.aiF(t);}
+  newJob(s){
+    const sc=this.sc,r=this.r;
+    const job={id:++this.jobSeq,src:s.id,value:lognorm(r,(+s.avgValue||0)*(1+sc.price/100),+s.valueSpread||0),born:this.d,color:s.color};
+    if(r()<sc.leadLoss/100){if(this.inW){this.o.lostExt++;this.o.lostExtVal+=job.value*(this.P[s.id+'|arrival']||0);}this.o.lostAll++;return;}
+    this.route(job,s.id,'arrival');
+  }
+  route(job,nid,tid){
+    const n=this.nodes[nid];
+    if(n.type==='outcome'){this.finish(job,n);return;}
+    const rt=this.routes[nid+'|'+tid];
+    if(!rt||!rt.length){this.o.unrouted++;return;}
+    let u=this.r(),e=rt[rt.length-1].e;for(const x of rt){u-=x.p;if(u<=0){e=x.e;break;}}
+    this.o.edgeFlow[e.id]=(this.o.edgeFlow[e.id]||0)+(this.inW?1:0);
+    if(this.inW)this.o.handoff+=+e.cost||0;
+    const delay=(+e.delay||0)>0?(+e.delay)*(0.8+0.4*this.r()):0;
+    if(this.vis)this.vis(e,this.d,delay,job);
+    const to=this.nodes[e.to];
+    const task=to.type==='dept'?(taskOf(to,e.toTask)?e.toTask:to.tasks[0]&&to.tasks[0].id):'';
+    if(delay<=0)this.enqueue(job,e.to,task,+e.priority||3);else this.transit.push({job,to:e.to,task,pri:+e.priority||3,at:this.d+delay});
+  }
+  enqueue(job,nid,tid,pri){
+    const n=this.nodes[nid];
+    if(n.type==='outcome'){this.finish(job,n);return;}
+    if(!tid){this.o.unrouted++;return;}
+    this.ns[nid].q.push({job,task:tid,pri,t:this.d});
+  }
+  finish(job,n){
+    if(n.kind==='revenue'){
+      if(this.inW){const v=job.value*(+n.realize||0)/100;this.o.revenue+=v;this.o.revBySrc[job.src]=(this.o.revBySrc[job.src]||0)+v;this.o.won++;(this.o.cycle[job.src]=this.o.cycle[job.src]||[]).push(this.d-job.born);}
+    }else this.o.lostAll++;
+    if(this.inW)this.o.outcomes[n.id]=(this.o.outcomes[n.id]||0)+1;
+  }
+  step(){
+    const d=this.d,r=this.r,sc=this.sc,inW=this.inW;
+    const weekend=(d%7)>=5;
+    // 1. arrivals
+    for(const s of this.sources){const n=s.n;const month=Math.floor(d/30.4);
+      if(s.month!==month){s.month=month;s.mf=(+n.cv||0)>0?lognorm(r,1,+n.cv):1;}
+      const season=1+((+n.seasonAmp||0)/100)*Math.cos(2*Math.PI*((month%12)-((+n.peakMonth||1)-1))/12);
+      const growth=Math.pow(1+(+n.growth||0)/100,(d-this.W)/365);
+      const lam=(+n.rate||0)/30.4*season*growth*(1+sc.demand/100)*s.mf;
+      const k=poisson(r,lam);for(let i=0;i<k;i++)this.newJob(n);}
+    // 2. transit arrivals
+    if(this.transit.length){const keep=[];for(const x of this.transit){if(x.at<=d)this.enqueue(x.job,x.to,x.task,x.pri);else keep.push(x);}this.transit=keep;}
+    // 3. departments
+    for(const n of this.depts){const st=this.ns[n.id];
+      if(st.waits.length){const keep=[];for(const w of st.waits){if(w.at<=d)this.route(w.job,n.id,w.task);else keep.push(w);}st.waits=keep;}
+    }
+    for(const n of this.depts){const st=this.ns[n.id],ec=this.econ[n.id];
+      if(d===this.W)st.backStart=this.backlog(n);
+      // deadline drops (lead lost because nobody got to it in time)
+      if(st.q.length){const keep=[];for(const q of st.q){const t=taskOf(n,q.task);if(t&&(+t.maxWait||0)>0&&d-q.t>+t.maxWait){this.o.lostAll++;if(inW){st.drops++;st.dropVal+=q.job.value;st.dropExp+=q.job.value*(this.P[n.id+'|'+q.task]||0);}}else keep.push(q);}st.q=keep;}
+      // pull from queue into active work (priority, then FIFO) up to WIP limit
+      const wip=Math.max(1,+n.wip||1);
+      if(st.q.length&&st.act.length<wip){st.q.sort((a,b)=>b.pri-a.pri||a.t-b.t);
+        while(st.act.length<wip&&st.q.length){const q=st.q.shift();const t=taskOf(n,q.task);if(!t)continue;
+          const eff=Math.max(0.1,tri(r,t.eMin,t.eMode,t.eMax)*this.aiF(t));
+          st.act.push({job:q.job,task:q.task,rem:eff,tot:eff});if(inW){st.waitSum+=d-q.t;st.waitN++;}}}
+      // share today's capacity across active jobs
+      const cap=(weekend&&!n.weekends)?0:ec.capDay;let left=cap;
+      for(let guard=0;guard<20&&left>1e-9;guard++){const live=st.act.filter(a=>a.rem>1e-9);if(!live.length)break;const share=left/live.length;
+        for(const a of live){const g=Math.min(share,a.rem);a.rem-=g;left-=g;if(inW){st.hWork+=g;st.taskHours[a.task]=(st.taskHours[a.task]||0)+g;}}}
+      if(inW)st.hAvail+=cap;
+      st.todayUtil=cap>0?(cap-left)/cap:st.todayUtil;
+      // completions
+      if(st.act.some(a=>a.rem<=1e-9)){const keep=[];
+        for(const a of st.act){if(a.rem>1e-9){keep.push(a);continue;}
+          const t=taskOf(n,a.task);
+          if(r()<(+t.rework||0)/100*sc.reworkMult){a.tot=a.tot*0.4;a.rem=a.tot;if(inW)st.reworks++;keep.push(a);continue;}
+          if(inW){st.material+=(+t.material||0)*(1+sc.material/100);st.done++;}
+          const w=((+t.wait||0)>0?(+t.wait)*(0.7+0.6*r()):0)+(t.supply?sc.supplyDelay:0);
+          if(w>0)st.waits.push({job:a.job,task:a.task,at:d+w});else this.route(a.job,n.id,a.task);}
+        st.act=keep;}
+      if(inW){st.qSum+=st.q.length;st.qMax=Math.max(st.qMax,st.q.length);if(this.series){st.wacc+=st.q.length;if((d-this.W)%7===6){st.wq.push(st.wacc/7);st.wacc=0;}}}
+    }
+    this.d++;
+  }
+  backlog(n){const st=this.ns[n.id];let h=st.act.reduce((s,a)=>s+a.rem,0);for(const q of st.q){const t=taskOf(n,q.task);if(t)h+=this.meanEff(t);}return h;}
+  wip(){let w=this.transit.length;for(const id in this.ns){const s=this.ns[id];w+=s.q.length+s.act.length+s.waits.length;}return w;}
+  run(){while(this.d<this.T)this.step();return this.result();}
+  result(){
+    const sc=this.sc,days=this.T-this.W,yf=days/365;
+    const nodes={};let pay=0,ovh=0,mat=0,ai=0,head=0;
+    for(const n of this.depts){const st=this.ns[n.id],ec=this.econ[n.id];
+      const backEnd=this.backlog(n);const demand=st.hWork+Math.max(0,backEnd-(st.backStart||0));
+      nodes[n.id]={util:st.hAvail>0?st.hWork/st.hAvail:0,avgQ:st.qSum/days,maxQ:st.qMax,avgWait:st.waitN?st.waitSum/st.waitN:0,done:st.done,
+        hWork:st.hWork,hAvail:st.hAvail,demand,drops:st.drops,dropVal:st.dropVal,dropExp:st.dropExp,reworks:st.reworks,
+        pay:ec.pay*yf,ovh:ec.overhead*yf,mat:st.material,ai:ec.ai*yf,head:ec.head,fte:ec.fte,rate:ec.rate,taskHours:{...st.taskHours},wq:st.wq,backEnd,
+        waitTotal:st.waitSum};
+      pay+=ec.pay*yf;ovh+=ec.overhead*yf;mat+=st.material;ai+=ec.ai*yf;head+=ec.head;}
+    const ga=sc.gaCost*yf;head+=+sc.gaHead||0;
+    const cost=pay+ovh+mat+ai+this.o.handoff+ga;
+    const rev=this.o.revenue;
+    let dropN=0,dropExp=0;for(const id in nodes){dropN+=nodes[id].drops;dropExp+=nodes[id].dropExp;}
+    return{rev,revBySrc:{...this.o.revBySrc},cost,costs:{pay,ovh,mat,ai,handoff:this.o.handoff,ga},profit:rev-cost,margin:rev>0?(rev-cost)/rev:0,head,rpe:head>0?rev/head:0,
+      won:this.o.won,outcomes:{...this.o.outcomes},cycle:this.o.cycle,nodes,edgeFlow:{...this.o.edgeFlow},dropN,dropExp,lostExt:this.o.lostExt,lostExtVal:this.o.lostExtVal,unrouted:this.o.unrouted,wipEnd:this.wip()};
+  }
+}
+
+/* Monte Carlo: runs in chunks so the UI stays responsive */
+function monteCarlo(model,sc,runs,onProg,opt={}){
+  return new Promise(res=>{const out=[];let i=0;const W=365,T=730;
+    const tick=()=>{const t0=performance.now();
+      while(i<runs&&performance.now()-t0<30){out.push(new Sim(model,sc,{seed:(sc.seed||1)*1000+i+1,days:T,warmup:W,series:opt.series!==false}).run());i++;}
+      onProg&&onProg(i/runs);
+      if(i<runs)setTimeout(tick,0);else res(out);};
+    tick();});
+}
+function aggregate(runs){
+  const q=(f)=>{const a=runs.map(f);return{p10:quant(a,.1),p50:quant(a,.5),p90:quant(a,.9),mean:mean(a),all:a};};
+  const A={n:runs.length,rev:q(r=>r.rev),cost:q(r=>r.cost),profit:q(r=>r.profit),margin:q(r=>r.margin),rpe:q(r=>r.rpe),won:q(r=>r.won),head:runs[0].head,
+    dropN:q(r=>r.dropN),dropExp:q(r=>r.dropExp),lostExt:q(r=>r.lostExt),lostExtVal:q(r=>r.lostExtVal),unrouted:q(r=>r.unrouted),
+    costs:{},nodes:{},edgeFlow:{},outcomes:{},revBySrc:{},cycle:{}};
+  for(const k of Object.keys(runs[0].costs))A.costs[k]=mean(runs.map(r=>r.costs[k]));
+  for(const k of Object.keys(runs[0].outcomes))A.outcomes[k]=mean(runs.map(r=>r.outcomes[k]||0));
+  for(const k of Object.keys(runs[0].revBySrc))A.revBySrc[k]=mean(runs.map(r=>r.revBySrc[k]||0));
+  const eids=new Set();runs.forEach(r=>Object.keys(r.edgeFlow).forEach(k=>eids.add(k)));
+  eids.forEach(k=>A.edgeFlow[k]=mean(runs.map(r=>r.edgeFlow[k]||0)));
+  for(const k of Object.keys(runs[0].cycle)){const all=[];runs.forEach(r=>(r.cycle[k]||[]).forEach(v=>all.push(v)));A.cycle[k]=all;}
+  for(const id of Object.keys(runs[0].nodes)){const g=f=>runs.map(r=>f(r.nodes[id]));const nd=runs[0].nodes[id];
+    const util=g(x=>x.util);const th={};Object.keys(nd.taskHours).forEach(t=>th[t]=mean(g(x=>x.taskHours[t]||0)));
+    const L=Math.max(...runs.map(r=>r.nodes[id].wq.length));const wq={mean:[],p10:[],p90:[]};
+    for(let w=0;w<L;w++){const col=runs.map(r=>r.nodes[id].wq[w]||0);wq.mean.push(mean(col));wq.p10.push(quant(col,.1));wq.p90.push(quant(col,.9));}
+    A.nodes[id]={util:{p10:quant(util,.1),p50:quant(util,.5),p90:quant(util,.9),mean:mean(util)},avgQ:mean(g(x=>x.avgQ)),maxQ:quant(g(x=>x.maxQ),.9),avgWait:mean(g(x=>x.avgWait)),
+      done:mean(g(x=>x.done)),hWork:mean(g(x=>x.hWork)),hAvail:mean(g(x=>x.hAvail)),demand:mean(g(x=>x.demand)),drops:mean(g(x=>x.drops)),dropExp:mean(g(x=>x.dropExp)),
+      reworks:mean(g(x=>x.reworks)),pay:nd.pay,ovh:nd.ovh,mat:mean(g(x=>x.mat)),ai:nd.ai,head:nd.head,fte:nd.fte,rate:nd.rate,taskHours:th,wq,backEnd:mean(g(x=>x.backEnd)),waitTotal:mean(g(x=>x.waitTotal))};}
+  return A;
+}
+
+/* =====================================================================
+   Analysis — bottlenecks, hiring, AI, handoffs
+   ===================================================================== */
+function analyse(A){
+  const depts=M.nodes.filter(n=>n.type==='dept'&&A.nodes[n.id]);
+  const maxWait=Math.max(1e-9,...depts.map(n=>A.nodes[n.id].waitTotal));
+  const maxDrop=Math.max(1e-9,...depts.map(n=>A.nodes[n.id].dropExp));
+  const rows=depts.map(n=>{const x=A.nodes[n.id];
+    const score=Math.round(60*Math.min(1.1,x.util.p50)+25*(x.waitTotal/maxWait)+15*(x.dropExp/maxDrop));
+    const perFte=x.fte>0?x.hAvail/x.fte:0;
+    const reqFte=perFte>0?x.demand/(perFte*0.80):0;
+    let hire=0;if(reqFte>x.fte+0.3)hire=Math.ceil(reqFte-x.fte);if(x.drops>=1&&hire<1)hire=1;
+    const slack=perFte>0&&x.util.p50<0.55?Math.floor(x.fte-x.demand/(perFte*0.75)):0;
+    const topRole=[...n.roles].sort((a,b)=>b.fte-a.fte)[0];
+    const cost=x.pay+x.ovh+x.mat+x.ai;
+    return{n,x,score,reqFte,hire,slack,topRole,cost,hireCost:hire*(topRole?+topRole.salary:0)*(1+SC.salaryInfl/100)};});
+  rows.sort((a,b)=>b.score-a.score);
+  const bott=rows.find(r=>r.x.util.p50>=0.8||r.x.drops>=1)||null;
+  // AI per task
+  const ai=[];depts.forEach(n=>{const x=A.nodes[n.id];n.tasks.forEach(t=>{const s=aiScore(t);const h=x.taskHours[t.id]||0;const lab=h*x.rate;const [rec,cls]=aiRec(s);
+    const red=rec==='Automate'?SC.autoRed:rec==='Augment (copilot)'?SC.augRed:0;
+    ai.push({n,t,score:s,hours:h,labor:lab,rec,cls,red,saving:lab*red/100,freed:h*red/100});});});
+  ai.sort((a,b)=>b.saving-a.saving);
+  // handoffs
+  const hand=M.edges.map(e=>{const f=A.edgeFlow[e.id]||0;return{e,flow:f,crit:f*(+e.importance||3),cost:f*(+e.cost||0)};}).sort((a,b)=>b.crit-a.crit);
+  return{rows,bott,ai,hand};
+}
+
+/* =====================================================================
+   Canvas rendering (n8n-style)
+   ===================================================================== */
+const ICONS={
+  source:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12h11M10 8l4 4-4 4"/><path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/></svg>',
+  dept:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.5a3 3 0 0 1 0 5.6M18 14.5c1.9.8 3 2.8 3 5.5"/></svg>',
+  revenue:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v18M16.5 7.5c-.7-1.4-2.4-2.2-4.5-2.2-2.6 0-4.3 1.3-4.3 3.2 0 4.4 9 2.3 9 6.8 0 2-1.9 3.4-4.7 3.4-2.3 0-4.1-.9-4.9-2.5"/></svg>',
+  lost:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>'};
+const canvas=$('#canvas'),world=$('#world'),edgesSvg=$('#edges'),nodesEl=$('#nodes'),tokSvg=$('#tokens');
+let view={x:60,y:60,k:0.62};
+function applyView(){world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.k})`;canvas.style.backgroundSize=`${48*view.k}px ${48*view.k}px`;canvas.style.backgroundPosition=`${view.x}px ${view.y}px`;}
+const nodeH={};
+function nodeSub(n){
+  if(n.type==='source')return`${fmtN(n.rate,1)} / month · avg ${fmt$(n.avgValue)}`;
+  if(n.type==='outcome')return n.kind==='revenue'?`Revenue · ${n.realize}% recognised`:'Lost / exit';
+  const ec=deptEcon(n,SC);return`${fmtN(ec.head,1)} people · ${fmt$(ec.pay)}/yr`;
+}
+function renderNodes(){
+  const A=RES&&RES.A,an=RES&&RES.an;
+  nodesEl.innerHTML=M.nodes.map(n=>{
+    const ico=n.type==='outcome'?ICONS[n.kind==='revenue'?'revenue':'lost']:ICONS[n.type];
+    let tasks='',foot='';
+    if(n.type==='dept'){tasks=`<div class="tk">${n.tasks.map(t=>`<span>${esc(t.name)}${t.aiMode!=='off'?' ⚡':''}</span>`).join('')}</div>`;
+      const u=A&&A.nodes[n.id]?A.nodes[n.id].util.p50:null;
+      const col=u==null?'var(--dim)':u>=0.85?'var(--bad)':u>=0.6?'var(--warn)':'var(--good)';
+      foot=`<div class="nf"><span>Util</span><div class="ub"><i style="width:${u==null?0:Math.min(100,u*100)}%;background:${col}"></i></div><b class="uv" style="font:600 11.5px var(--mono);color:var(--ink)">${u==null?'—':pct(u)}</b></div>`;}
+    else if(n.type==='source'&&A){foot=`<div class="nf">Revenue ${fmt$(A.revBySrc[n.id]||0)}/yr</div>`;}
+    else if(n.type==='outcome'&&A){foot=`<div class="nf">${fmtN(A.outcomes[n.id]||0,1)} / yr</div>`;}
+    let heat='';if(A&&n.type==='dept'&&A.nodes[n.id]){const u=A.nodes[n.id].util.p50;heat=u>=0.85?'heat-r':u>=0.6?'heat-a':'heat-g';}
+    const bn=an&&an.bott&&an.bott.n.id===n.id?' bneck':'';
+    return`<div class="node ${n.type} ${heat}${bn}${SEL&&SEL.kind==='node'&&SEL.id===n.id?' sel':''}" data-id="${n.id}" style="left:${n.x}px;top:${n.y}px;--c:${n.color||'#888'}">
+      <span class="flag">BOTTLENECK</span><div class="live"><b class="q">Q 0</b><b class="a">▶ 0</b><b class="w">⏳ 0</b></div>
+      ${n.type!=='source'?'<div class="port in"></div>':''}${n.type!=='outcome'?'<div class="port out"></div>':''}
+      <div class="nh"><span class="ico">${ico}</span><div style="min-width:0"><div class="nt">${esc(n.name)}</div><div class="ns">${nodeSub(n)}</div></div></div>
+      ${tasks}${foot}</div>`;}).join('');
+  $$('.node',nodesEl).forEach(el=>nodeH[el.dataset.id]=el.offsetHeight);
+  $('#emptyWs').classList.toggle('on',!M.nodes.length);$('#tip0').style.display=M.nodes.length&&!live?'':'none';
+  renderEdges();
+}
+const edgePath={};
+function portPos(n,side){const w=n.type==='outcome'?200:232;return side==='out'?{x:n.x+w,y:n.y+33}:{x:n.x,y:n.y+33};}
+function curve(a,b,self){
+  if(self){return`M${a.x},${a.y} C${a.x+90},${a.y-150} ${b.x-90},${b.y-150} ${b.x},${b.y}`;}
+  const dx=b.x-a.x;const c=Math.max(70,Math.abs(dx)*0.45);
+  if(dx<0){const dy=b.y-a.y;const lift=Math.abs(dy)<60?-140:0;return`M${a.x},${a.y} C${a.x+c},${a.y+lift} ${b.x-c},${b.y+lift} ${b.x},${b.y}`;}
+  return`M${a.x},${a.y} C${a.x+c},${a.y} ${b.x-c},${b.y} ${b.x},${b.y}`;
+}
+function edgeProbs(){const g={};M.edges.forEach(e=>{const f=nodeById(e.from);const k=e.from+'|'+(f&&f.type==='source'?'arrival':e.fromTask);(g[k]=g[k]||[]).push(e);});const p={};for(const k in g){const t=g[k].reduce((s,e)=>s+Math.max(0,+e.prob||0),0);g[k].forEach(e=>p[e.id]=t>0?(Math.max(0,+e.prob||0)/t):1/g[k].length);}return p;}
+function renderEdges(){
+  const A=RES&&RES.A;const probs=edgeProbs();
+  const maxF=A?Math.max(1,...Object.values(A.edgeFlow)):1;
+  let h='';
+  for(const e of M.edges){const f=nodeById(e.from),t=nodeById(e.to);if(!f||!t)continue;
+    const a=portPos(f,'out'),b=portPos(t,'in');const d=curve(a,b,e.from===e.to);
+    const w=A?1.5+7*Math.sqrt((A.edgeFlow[e.id]||0)/maxF):2;
+    const tt=t.type==='dept'?taskOf(t,e.toTask):null;
+    let lab=e.label||(tt?tt.name:t.name);if(lab.length>24)lab=lab.slice(0,23)+'…';
+    const pr=Math.round((probs[e.id]||0)*100)+'%';
+    h+=`<g class="edge ${e.type}${SEL&&SEL.kind==='edge'&&SEL.id===e.id?' sel':''}" data-id="${e.id}"><path class="ln" d="${d}" style="stroke-width:${w}"/><path class="hit" d="${d}"/>
+      <g class="elab" data-for="${e.id}"><rect rx="6" ry="6"/><text class="p">${pr}</text><text class="l">${esc(lab)}</text></g></g>`;}
+  edgesSvg.innerHTML=h+'<path class="tmp" id="tmpEdge" d=""/>';
+  // arrowheads + label positions
+  $$('g.edge',edgesSvg).forEach(g=>{const p=g.querySelector('path.ln');edgePath[g.dataset.id]=p;const L=p.getTotalLength();const m=p.getPointAtLength(L*0.5);
+    const lab=g.querySelector('.elab'),tp=lab.querySelector('.p'),tl=lab.querySelector('.l');
+    tp.setAttribute('x',m.x-0);tp.setAttribute('y',m.y+4);const pw=tp.getComputedTextLength();
+    tl.setAttribute('x',m.x+pw+6);tl.setAttribute('y',m.y+4);const lw=tl.getComputedTextLength();
+    const tot=pw+lw+18;const x0=m.x-tot/2;tp.setAttribute('x',x0+7);tl.setAttribute('x',x0+7+pw+6);
+    const r=lab.querySelector('rect');r.setAttribute('x',x0);r.setAttribute('y',m.y-10);r.setAttribute('width',tot);r.setAttribute('height',20);
+    const e2=p.getPointAtLength(L),e1=p.getPointAtLength(Math.max(0,L-10));const ang=Math.atan2(e2.y-e1.y,e2.x-e1.x);
+    const ar=document.createElementNS('http://www.w3.org/2000/svg','path');const s=8;
+    ar.setAttribute('d',`M${e2.x},${e2.y} L${e2.x-s*Math.cos(ang-0.45)},${e2.y-s*Math.sin(ang-0.45)} L${e2.x-s*Math.cos(ang+0.45)},${e2.y-s*Math.sin(ang+0.45)}Z`);
+    ar.setAttribute('fill',getComputedStyle(p).stroke);g.insertBefore(ar,lab);});
+}
+function renderAll(){$('#modelName').value=M.name||'';renderNodes();renderInspector();}
+
+/* ---------- canvas interaction ---------- */
+let drag=null;
+function toWorld(cx,cy){const r=canvas.getBoundingClientRect();return{x:(cx-r.left-view.x)/view.k,y:(cy-r.top-view.y)/view.k};}
+canvas.addEventListener('mousedown',ev=>{
+  if(ev.button!==0)return;
+  const port=ev.target.closest('.port.out');const nodeEl=ev.target.closest('.node');const edgeG=ev.target.closest('g.edge');
+  if(port){const n=nodeById(port.closest('.node').dataset.id);drag={type:'connect',from:n};ev.preventDefault();return;}
+  if(nodeEl){const n=nodeById(nodeEl.dataset.id);const p=toWorld(ev.clientX,ev.clientY);drag={type:'node',n,dx:p.x-n.x,dy:p.y-n.y,moved:false};select('node',n.id);ev.preventDefault();return;}
+  if(edgeG){select('edge',edgeG.dataset.id);return;}
+  if(ev.target.closest('.hud,.legend,.zoomctl,.tip0'))return;
+  drag={type:'pan',sx:ev.clientX,sy:ev.clientY,vx:view.x,vy:view.y,moved:false};canvas.classList.add('panning');
+});
+window.addEventListener('mousemove',ev=>{
+  if(!drag)return;
+  if(drag.type==='pan'){view.x=drag.vx+ev.clientX-drag.sx;view.y=drag.vy+ev.clientY-drag.sy;if(Math.abs(ev.clientX-drag.sx)+Math.abs(ev.clientY-drag.sy)>3)drag.moved=true;applyView();}
+  else if(drag.type==='node'){const p=toWorld(ev.clientX,ev.clientY);drag.n.x=Math.round((p.x-drag.dx)/10)*10;drag.n.y=Math.round((p.y-drag.dy)/10)*10;drag.moved=true;
+    const el=nodesEl.querySelector(`[data-id="${drag.n.id}"]`);el.style.left=drag.n.x+'px';el.style.top=drag.n.y+'px';renderEdges();}
+  else if(drag.type==='connect'){const a=portPos(drag.from,'out'),b=toWorld(ev.clientX,ev.clientY);$('#tmpEdge').setAttribute('d',curve(a,b,false));}
+});
+window.addEventListener('mouseup',ev=>{
+  if(!drag)return;const d=drag;drag=null;canvas.classList.remove('panning');
+  if(d.type==='pan'&&!d.moved&&ev.target.closest('#canvas'))select(null);
+  if(d.type==='node'&&d.moved)save();
+  if(d.type==='connect'){$('#tmpEdge')&&$('#tmpEdge').setAttribute('d','');
+    const el=document.elementFromPoint(ev.clientX,ev.clientY);const tgt=el&&el.closest('.node');if(!tgt)return;
+    const to=nodeById(tgt.dataset.id);if(to.type==='source'){toast('Inputs cannot receive work — connect into a department or outcome.');return;}
+    const from=d.from;if(from.id===to.id&&from.type!=='dept')return;
+    const e=E(from.id,from.type==='source'?'arrival':(from.tasks[0]||{}).id,to.id,to.type==='dept'?(to.tasks[0]||{}).id:'',{});
+    if(from.id===to.id&&from.tasks[1])e.toTask=from.tasks[1].id;
+    M.edges.push(e);save();invalidate();select('edge',e.id);toast('Connection created — set its task, routing % and attributes on the right.');}
+});
+canvas.addEventListener('wheel',ev=>{if(!(ev.ctrlKey||ev.metaKey))return;ev.preventDefault();const r=canvas.getBoundingClientRect();const mx=ev.clientX-r.left,my=ev.clientY-r.top;
+  const k2=clamp(view.k*Math.exp(-ev.deltaY*0.0015),0.2,2);view.x=mx-(mx-view.x)*k2/view.k;view.y=my-(my-view.y)*k2/view.k;view.k=k2;applyView();},{passive:false});
+function zoomBy(f){const r=canvas.getBoundingClientRect();const mx=r.width/2,my=r.height/2;const k2=clamp(view.k*f,0.2,2);view.x=mx-(mx-view.x)*k2/view.k;view.y=my-(my-view.y)*k2/view.k;view.k=k2;applyView();}
+$('#zIn').onclick=()=>zoomBy(1.2);$('#zOut').onclick=()=>zoomBy(1/1.2);
+function fit(){if(!M.nodes.length)return;const r=canvas.getBoundingClientRect();let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  M.nodes.forEach(n=>{x0=Math.min(x0,n.x);y0=Math.min(y0,n.y-40);x1=Math.max(x1,n.x+240);y1=Math.max(y1,n.y+(nodeH[n.id]||140));});
+  const k=clamp(Math.min((r.width-80)/(x1-x0),(r.height-150)/(y1-y0)),0.2,1.2);view.k=k;view.x=(r.width-(x1-x0)*k)/2-x0*k;view.y=70+(r.height-150-(y1-y0)*k)/2-y0*k;applyView();}
+$('#btnFit').onclick=fit;
+
+function select(kind,id){SEL=kind?{kind,id}:null;
+  $$('.node',nodesEl).forEach(el=>el.classList.toggle('sel',!!SEL&&SEL.kind==='node'&&el.dataset.id===SEL.id));
+  $$('g.edge',edgesSvg).forEach(el=>el.classList.toggle('sel',!!SEL&&SEL.kind==='edge'&&el.dataset.id===SEL.id));
+  renderInspector();}
+function delSelected(){if(!SEL)return;
+  if(SEL.kind==='node'){const n=nodeById(SEL.id);if(!confirm(`Delete “${n.name}” and its connections?`))return;M.nodes=M.nodes.filter(x=>x.id!==SEL.id);M.edges=M.edges.filter(e=>e.from!==SEL.id&&e.to!==SEL.id);}
+  else M.edges=M.edges.filter(e=>e.id!==SEL.id);
+  SEL=null;save();invalidate();renderAll();}
+$('#btnDel').onclick=delSelected;
+window.addEventListener('keydown',ev=>{if((ev.key==='Delete'||ev.key==='Backspace')&&!ev.target.closest('input,select,textarea')&&$('#v-model').classList.contains('on')){ev.preventDefault();delSelected();}});
+
+function addNode(type){const r=canvas.getBoundingClientRect();const c=toWorld(r.left+r.width/2-110,r.top+r.height/2-60);
+  let n;
+  if(type==='source')n={id:uid('src'),type,x:c.x,y:c.y,name:'New input',color:'#5fb0c9',rate:10,cv:20,seasonAmp:0,peakMonth:1,growth:0,avgValue:10000,valueSpread:30,note:''};
+  else if(type==='outcome')n={id:uid('out'),type,x:c.x,y:c.y,name:'New outcome',kind:'revenue',realize:100,color:'#3ecf8e'};
+  else n={id:uid('dept'),type:'dept',x:c.x,y:c.y,name:'New department',color:['#ff7a45','#9b7bff','#3ecf8e','#f5b83d','#dd594e','#5fb0c9','#e28083'][M.nodes.length%7],
+    manager:{name:'Manager',salary:120000},roles:[{role:'Specialist',fte:2,salary:80000}],hoursPerDay:8,productive:80,wip:4,weekends:false,overhead:2000,
+    tasks:[T(uid('t'),'Main task',4,8,16)]};
+  n.x=Math.round(n.x/10)*10;n.y=Math.round(n.y/10)*10;M.nodes.push(n);save();invalidate();renderNodes();select('node',n.id);}
+$$('[data-add]').forEach(b=>b.onclick=()=>addNode(b.dataset.add));
+let RUNNING=false;
+function activate(id){if(RUNNING){toast('Wait a second — the simulation is still running');return;}if(live)stopLive(true);save();WS.active=id;useWs();$('#resReady').classList.remove('on');renderAll();renderScenario();renderInsights();renderWsTabs();persist();requestAnimationFrame(()=>requestAnimationFrame(fit));}
+function addWs(model,sc,tag){const w=newWs(model,sc,tag);WS.list.push(w);activate(w.id);return w;}
+function closeWs(id){const w=WS.list.find(x=>x.id===id);if(!w)return;if(!confirm(`Close “${w.M.name}”? Its model and saved scenarios will be removed from this browser.`))return;
+  const i=WS.list.indexOf(w);WS.list.splice(i,1);if(!WS.list.length)WS.list.push(newWs(BLANK()));
+  if(WS.active===id){WS.active=WS.list[Math.max(0,i-1)].id;useWs();renderAll();renderScenario();renderInsights();requestAnimationFrame(()=>requestAnimationFrame(fit));}persist();renderWsTabs();}
+function renderWsTabs(){const el=$('#wstabs');el.innerHTML=WS.list.map(w=>`<div class="wstab${w.id===WS.active?' on':''}" data-ws="${w.id}" title="${esc(w.M.name)}"><span>${esc(w.M.name||'Untitled')}</span>${w.tag?`<i class="tg">${w.tag}</i>`:''}<button class="x" data-close="${w.id}" title="Close tab">×</button></div>`).join('')+'<button class="wsadd" id="wsAdd" title="New empty workspace">+</button>';}
+$('#wstabs').addEventListener('click',ev=>{const c=ev.target.closest('[data-close]');if(c){ev.stopPropagation();closeWs(c.dataset.close);return;}
+  if(ev.target.closest('#wsAdd')){addWs(BLANK());return;}const t=ev.target.closest('[data-ws]');if(t&&t.dataset.ws!==WS.active)activate(t.dataset.ws);});
+$('#btnSample').onclick=()=>addWs(SAMPLE(),null,'SAMPLE');
+$('#btnBlank').onclick=()=>addWs(BLANK());
+$('#btnExport').onclick=()=>{const b=new Blob([JSON.stringify({model:M,assumptions:SC},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(M.name||'model').replace(/[^\w-]+/g,'_')+'.flowtwin.json';a.click();};
+$('#btnImport').onclick=()=>$('#fileIn').click();
+$('#fileIn').onchange=ev=>{const f=ev.target.files[0];if(!f)return;f.text().then(t=>{try{const o=JSON.parse(t);if(!o.model||!o.model.nodes)throw 0;addWs(o.model,Object.assign(DEFAULT_SC(),o.assumptions||{}),'IMPORT');toast('Model imported into a new tab');}catch(e){toast('That file is not a FlowTwin model');}});ev.target.value='';};
+$('#modelName').oninput=ev=>{M.name=ev.target.value;save();};
+
+/* Share: the whole workspace is compressed into the URL fragment (#m=...) — nothing is sent to a server */
+const PUBLIC_URL='https://navidnajmabadi.github.io/FlowTwin/';
+async function packShare(obj){const cs=new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('deflate-raw'));const b=new Uint8Array(await new Response(cs).arrayBuffer());let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+async function unpackShare(str){const bin=atob(str.replace(/-/g,'+').replace(/_/g,'/'));const u=Uint8Array.from(bin,c=>c.charCodeAt(0));const ds=new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return JSON.parse(await new Response(ds).text());}
+$('#btnShare').onclick=async()=>{
+  const base=/^https?:$/.test(location.protocol)&&!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?location.origin+location.pathname:PUBLIC_URL;
+  const url=base+'#m='+await packShare({model:M,assumptions:SC});
+  try{await navigator.clipboard.writeText(url);toast('Share link copied — anyone who opens it gets this workspace in a new tab');}catch(e){prompt('Copy this share link',url);}};
+async function openSharedFromHash(){const m=location.hash.match(/^#m=(.+)$/);if(!m)return;
+  try{const o=await unpackShare(m[1]);if(!o.model||!o.model.nodes)throw 0;o.model.name=(o.model.name||'Shared model');addWs(o.model,Object.assign(DEFAULT_SC(),o.assumptions||{}),'SHARED');toast('Opened the shared workspace in a new tab');}
+  catch(e){toast('That share link is broken or incomplete');}
+  history.replaceState(null,'',location.pathname+location.search);}
+
+/* results become stale when the model changes */
+function invalidate(){if(RES){RES.stale=true;const b=$('#staleNote');if(b)b.style.display='';}}
+
+/* =====================================================================
+   Inspector (attribute editor)
+   ===================================================================== */
+class Binder{constructor(){this.b=[];}reset(){this.b=[];}add(get,set){this.b.push({get,set});return this.b.length-1;}}
+const IB=new Binder(),SB=new Binder();
+function F(B,label,obj,key,o={}){const i=B.add(()=>obj[key],v=>obj[key]=v);const type=o.type||'number';
+  return`<label class="f${o.full?' full':''}"><span>${label}${o.hint?`<i title="${esc(o.hint)}">?</i>`:''}</span><input data-b="${i}" data-t="${type}" type="${type}" value="${esc(obj[key])}"${o.step!=null?` step="${o.step}"`:''}${o.min!=null?` min="${o.min}"`:''}${o.max!=null?` max="${o.max}"`:''}${o.unit?' style="padding-right:'+(12+o.unit.length*6)+'px"':''}>${o.unit?`<em>${o.unit}</em>`:''}</label>`;}
+function S(B,label,obj,key,opts,o={}){const i=B.add(()=>obj[key],v=>obj[key]=v);
+  return`<label class="f${o.full?' full':''}"><span>${label}${o.hint?`<i title="${esc(o.hint)}">?</i>`:''}</span><select data-b="${i}" data-t="text"${o.re?' data-re="1"':''}>${opts.map(([v,t])=>`<option value="${esc(v)}"${String(obj[key])===String(v)?' selected':''}>${esc(t)}</option>`).join('')}</select></label>`;}
+function R(B,label,obj,key,min,max,step,o={}){const i=B.add(()=>obj[key],v=>obj[key]=v);
+  return`<label class="f rg${o.full?' full':''}"><span>${label}<b>${obj[key]}${o.unit||''}</b>${o.hint?`<i title="${esc(o.hint)}">?</i>`:''}</span><input type="range" data-b="${i}" data-t="number" data-u="${o.unit||''}" min="${min}" max="${max}" step="${step}" value="${obj[key]}"${o.re?' data-re="1"':''}></label>`;}
+function C(B,label,obj,key){const i=B.add(()=>obj[key],v=>obj[key]=v);return`<label class="chk"><input type="checkbox" data-b="${i}" data-t="bool"${obj[key]?' checked':''}>${label}</label>`;}
+function wireBinder(root,B,after){
+  const h=ev=>{const el=ev.target;if(el.dataset.b==null)return;const b=B.b[+el.dataset.b];if(!b)return;
+    const t=el.dataset.t;let v=t==='bool'?el.checked:t==='number'?(el.value===''?0:parseFloat(el.value)):el.value;if(t==='number'&&isNaN(v))v=0;
+    b.set(v);if(el.type==='range'){const lb=el.parentElement.querySelector('b');if(lb)lb.textContent=v+(el.dataset.u||'');}
+    after(el,ev.type);};
+  root.addEventListener('input',h);root.addEventListener('change',ev=>{if(ev.target.dataset.re)after(ev.target,'re');});
+}
+const insp=$('#insp');
+let rnT=null;
+wireBinder(insp,IB,(el,type)=>{save();invalidate();clearTimeout(rnT);rnT=setTimeout(()=>{renderNodes();},120);if(type==='re')renderInspector();});
+insp.addEventListener('click',ev=>{const b=ev.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;const n=SEL&&SEL.kind==='node'?nodeById(SEL.id):null;
+  if(a==='addRole'){n.roles.push({role:'New role',fte:1,salary:70000});}
+  else if(a==='delRole'){n.roles.splice(+b.dataset.i,1);}
+  else if(a==='addTask'){n.tasks.push(T(uid('t'),'New task',4,8,16));}
+  else if(a==='delTask'){const t=n.tasks[+b.dataset.i];if(n.tasks.length<2){toast('A department needs at least one task');return;}n.tasks.splice(+b.dataset.i,1);M.edges.forEach(e=>{if(e.from===n.id&&e.fromTask===t.id)e.fromTask=n.tasks[0].id;if(e.to===n.id&&e.toTask===t.id)e.toTask=n.tasks[0].id;});}
+  else if(a==='hireApply'){const r=n.roles[+b.dataset.i];r.fte=+(r.fte+ +b.dataset.k).toFixed(2);toast(`${r.role} → ${r.fte} FTE. Run the simulation again to see the effect.`);}
+  else if(a==='goEdge'){select('edge',b.dataset.id);return;}
+  else if(a==='goNode'){select('node',b.dataset.id);return;}
+  else return;
+  save();invalidate();renderNodes();renderInspector();});
+
+function renderInspector(){
+  IB.reset();const B=IB;
+  if(!SEL){insp.innerHTML=`<div class="empty"><h4>${esc(M.name||'Model')}</h4>
+    <p>${M.nodes.filter(n=>n.type==='dept').length} departments · ${M.nodes.filter(n=>n.type==='source').length} inputs · ${M.edges.length} connections</p>
+    <ol><li><b>Inputs</b> bring work in from outside (tenders, tickets, leads).</li><li><b>Departments</b> hold the team, costs, capacity and the tasks they perform.</li>
+    <li><b>Lines</b> hand work from a finished task to the next task — with routing %, priority, handoff cost, delay and importance.</li>
+    <li><b>Outcomes</b> end the journey as revenue or as lost work.</li></ol>
+    <p>Set the market assumptions under <b>Assumptions</b>, then press <b>Run simulation</b> — the insights appear below the workflow. Click any node or line to edit it.</p>
+    <div class="infobox">All numbers in the sample are illustrative assumptions for a demo, not real company data.</div></div>`;return;}
+  if(SEL.kind==='edge')return renderEdgeInsp(B);
+  const n=nodeById(SEL.id);if(!n){SEL=null;return renderInspector();}
+  const kindLbl=n.type==='source'?'Input · demand source':n.type==='outcome'?'Outcome':'Department';
+  const ico=n.type==='outcome'?ICONS[n.kind==='revenue'?'revenue':'lost']:ICONS[n.type];
+  let h=`<div class="ih"><span class="ico" style="background:${n.color}">${ico}</span><div style="flex:1;min-width:0"><h3>${esc(n.name)}</h3><small>${kindLbl}</small></div></div>`;
+  h+=`<div class="sec"><div class="g2">${F(B,'Name',n,'name',{type:'text',full:true})}${F(B,'Colour',n,'color',{type:'color'})}</div></div>`;
+  if(n.type==='source'){
+    h+=`<div class="sec"><div class="st">Demand</div><div class="g2">
+      ${F(B,'Arrivals per month',n,'rate',{step:0.5,min:0,hint:'Average number of new jobs (tenders, tickets, leads) per month at the start of the year'})}
+      ${F(B,'Month-to-month volatility',n,'cv',{unit:'%',min:0,hint:'How much monthly volume swings randomly (coefficient of variation)'})}
+      ${F(B,'Seasonality',n,'seasonAmp',{unit:'±%',min:0,max:90,hint:'Peak-to-average swing across the year'})}
+      ${S(B,'Peak month',n,'peakMonth',['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i)=>[i+1,m]))}
+      ${F(B,'Annual growth',n,'growth',{unit:'%',hint:'Trend growth in arrivals over the year'})}
+      </div></div>
+      <div class="sec"><div class="st">Value per job</div><div class="g2">
+      ${F(B,'Average contract value',n,'avgValue',{unit:'$',min:0})}${F(B,'Value spread',n,'valueSpread',{unit:'%',min:0,hint:'Variation in value between jobs (log-normal CV)'})}</div>
+      <label class="f full" style="margin-top:8px"><span>Notes</span><textarea data-b="${B.add(()=>n.note,v=>n.note=v)}" data-t="text" rows="2">${esc(n.note||'')}</textarea></label></div>`;
+    h+=resultBlock(n);
+  }else if(n.type==='outcome'){
+    h+=`<div class="sec"><div class="st">Outcome</div><div class="g2">${S(B,'Type',n,'kind',[['revenue','Revenue (job completed & paid)'],['lost','Lost / exit']],{re:1,full:true})}
+      ${n.kind==='revenue'?F(B,'Revenue recognised',n,'realize',{unit:'%',min:0,max:100,hint:'Share of the contract value collected (e.g. 97% after retention / bad debt)'}):''}</div></div>`;
+    h+=resultBlock(n);
+  }else{
+    const ec=deptEcon(n,SC);
+    h+=`<div class="sec"><div class="st">Summary</div><div class="kv">
+      <span>Headcount</span><b>${fmtN(ec.head,1)}</b><span>Annual payroll</span><b>${fmt$(ec.pay)}</b><span>Overhead / yr</span><b>${fmt$(ec.overhead)}</b>
+      <span>Productive capacity</span><b>${fmtN(ec.capDay*5,0)} h/wk</b><span>Loaded cost / productive hour</span><b>$${fmtN(ec.rate,0)}</b>${ec.ai?`<span>AI tooling / yr</span><b>${fmt$(ec.ai)}</b>`:''}</div></div>`;
+    h+=`<div class="sec"><div class="st">Team <button class="btn sm" data-act="addRole">+ Role</button></div>
+      <div class="g2" style="margin-bottom:10px">${F(B,'Manager / lead',n.manager,'name',{type:'text',hint:'Leave empty if the team has no dedicated manager'})}${F(B,'Manager salary',n.manager,'salary',{unit:'$/yr'})}</div>
+      <table class="roles"><tr><th>Role</th><th style="width:58px">FTE</th><th style="width:92px">Salary $/yr</th><th></th></tr>
+      ${n.roles.map((r,i)=>`<tr><td><input data-b="${B.add(()=>r.role,v=>r.role=v)}" data-t="text" value="${esc(r.role)}"></td><td><input data-b="${B.add(()=>r.fte,v=>r.fte=v)}" data-t="number" type="number" step="0.5" min="0" value="${r.fte}"></td><td><input data-b="${B.add(()=>r.salary,v=>r.salary=v)}" data-t="number" type="number" step="1000" value="${r.salary}"></td><td><button class="x" data-act="delRole" data-i="${i}" title="Remove">×</button></td></tr>`).join('')}</table>
+      <div class="sub">Capacity & limits</div><div class="g2">
+      ${F(B,'Hours per day',n,'hoursPerDay',{unit:'h',step:0.5})}${F(B,'Productive time',n,'productive',{unit:'%',hint:'Share of paid hours spent on the process tasks (the rest is meetings, admin, training)'})}
+      ${F(B,'Max jobs in parallel (WIP)',n,'wip',{min:1,hint:'Hard limit on jobs worked at once — e.g. crane bays on a factory line'})}${F(B,'Other direct cost',n,'overhead',{unit:'$/mo',hint:'Software, equipment, rent share, energy, travel'})}
+      <div class="f full">${C(B,'Works weekends',n,'weekends')}</div></div></div>`;
+    h+=`<div class="sec"><div class="st">Tasks (inputs this team performs) <button class="btn sm" data-act="addTask">+ Task</button></div>`;
+    n.tasks.forEach((t,i)=>{const s=aiScore(t),[rec,cls]=aiRec(s);
+      h+=`<details class="task"${i===0&&n.tasks.length<3?' open':''}><summary><span>${esc(t.name)}</span><span class="rec pill ${cls}">AI ${s} · ${rec.split(' ')[0]}</span></summary><div class="tb">
+        <div class="g2">${F(B,'Task name',t,'name',{type:'text',full:true})}</div>
+        <div class="sub">Effort per job (hours, triangular)</div><div class="g3">${F(B,'Min',t,'eMin',{step:0.5})}${F(B,'Most likely',t,'eMode',{step:0.5})}${F(B,'Max',t,'eMax',{step:0.5})}</div>
+        <div class="sub">Time, quality & cost</div><div class="g2">
+        ${F(B,'Waiting time after work',t,'wait',{unit:'days',hint:'Non-labour lead time after the work is done — client decision, curing, shipping, payment terms'})}
+        ${F(B,'Rework / error rate',t,'rework',{unit:'%',hint:'Chance the job must be partly redone (40% of the effort) before it can move on'})}
+        ${F(B,'Material / direct cost per job',t,'material',{unit:'$'})}
+        ${F(B,'Deadline in queue',t,'maxWait',{unit:'days',hint:'If a job waits longer than this before anyone starts it, it is lost (e.g. tender deadline). 0 = never.'})}
+        <div class="f full">${C(B,'Depends on suppliers (affected by supply-delay scenario)',t,'supply')}</div></div>
+        <div class="sub">AI suitability profile</div><div class="g2">
+        ${R(B,'Repetitive',t.ai,'rep',0,10,1,{re:1})}${R(B,'Judgement needed',t.ai,'judg',0,10,1,{re:1})}
+        ${R(B,'Data is digital',t.ai,'data',0,10,1,{re:1})}${R(B,'Client-facing',t.ai,'client',0,10,1,{re:1})}
+        ${R(B,'Physical work',t.ai,'phys',0,10,1,{re:1,full:true})}
+        ${S(B,'AI mode in simulation',t,'aiMode',[['off','Off — humans only'],['augment',`Augment — copilot (−${SC.augRed}% effort)`],['automate',`Automate — agent (−${SC.autoRed}% effort)`]],{re:1,full:true})}</div>
+        <div style="margin-top:10px;display:flex;justify-content:flex-end"><button class="btn sm" data-act="delTask" data-i="${i}">Remove task</button></div>
+      </div></details>`;});
+    h+=`</div>`;
+    h+=resultBlock(n);
+  }
+  // connections list
+  const ins=M.edges.filter(e=>e.to===n.id),outs=M.edges.filter(e=>e.from===n.id);
+  if(ins.length||outs.length){h+=`<div class="sec"><div class="st">Connections</div>${[...ins.map(e=>['←',e,nodeById(e.from)]),...outs.map(e=>['→',e,nodeById(e.to)])].map(([dir,e,o])=>`<div style="display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12.5px"><span style="color:var(--dim);width:14px">${dir}</span><a href="#" data-act="goEdge" data-id="${e.id}" style="color:var(--ink);text-decoration:none;flex:1">${esc(e.label||'(unlabelled)')} <span style="color:var(--muted)">· ${esc(o?o.name:'?')}</span></a><span class="pill ${e.type==='win'?'p-ok':e.type==='loss'?'p-bad':e.type==='rework'?'p-warn':'p-hum'}">${e.type}</span></div>`).join('')}</div>`;}
+  insp.innerHTML=h;
+}
+function resultBlock(n){
+  if(!RES)return`<div class="sec"><div class="infobox">Press Run simulation to see utilisation, queues, bottleneck and hiring advice for this node.</div></div>`;
+  const A=RES.A,an=RES.an;let h=`<div class="sec"><div class="st">Simulation results (P50 of ${A.n} runs)${RES.stale?' <span class="pill p-warn">stale</span>':''}</div>`;
+  if(n.type==='dept'&&A.nodes[n.id]){const x=A.nodes[n.id],row=an.rows.find(r=>r.n.id===n.id);
+    h+=`<div class="kv"><span>Utilisation (P10–P90)</span><b>${pct(x.util.p50)} (${pct(x.util.p10)}–${pct(x.util.p90)})</b>
+      <span>Avg queue / worst queue</span><b>${fmtN(x.avgQ,1)} / ${fmtN(x.maxQ,0)} jobs</b><span>Avg wait before start</span><b>${fmtN(x.avgWait,1)} days</b>
+      <span>Jobs completed / yr</span><b>${fmtN(x.done,0)}</b><span>Hours demanded vs available</span><b>${fmtN(x.demand,0)} / ${fmtN(x.hAvail,0)}</b>
+      ${x.drops>0.05?`<span>Leads lost to deadline</span><b style="color:var(--bad)">${fmtN(x.drops,1)} (${fmt$(x.dropExp)} exp.)</b>`:''}
+      <span>Total cost / yr</span><b>${fmt$(row.cost)}</b><span>Bottleneck score</span><b>${row.score}/100</b></div>`;
+    if(row.hire>0&&row.topRole){const i=n.roles.indexOf(row.topRole);h+=`<div class="warnbox">Needs ≈ ${fmtN(row.reqFte,1)} FTE to run at 80% load. Suggest <b>+${row.hire} ${esc(row.topRole.role)}</b> (${fmt$(row.hireCost)}/yr). <button class="btn sm" data-act="hireApply" data-i="${i}" data-k="${row.hire}" style="margin-top:6px">Apply +${row.hire} FTE</button></div>`;}
+    else if(row.slack>0)h+=`<div class="infobox" style="margin-top:8px">Over capacity by ≈ ${row.slack} FTE at 75% target load — consider redeploying or taking on more work.</div>`;}
+  else if(n.type==='source'){h+=`<div class="kv"><span>Revenue from this input</span><b>${fmt$(A.revBySrc[n.id]||0)}</b>${A.cycle[n.id]&&A.cycle[n.id].length?`<span>Arrival → cash (P50 / P90)</span><b>${fmtN(quant(A.cycle[n.id],.5),0)} / ${fmtN(quant(A.cycle[n.id],.9),0)} days</b>`:''}</div>`;}
+  else if(n.type==='outcome'){h+=`<div class="kv"><span>Jobs ending here / yr</span><b>${fmtN(A.outcomes[n.id]||0,1)}</b></div>`;}
+  return h+'</div>';
+}
+function renderEdgeInsp(B){
+  const e=M.edges.find(x=>x.id===SEL.id);if(!e){SEL=null;return renderInspector();}
+  const f=nodeById(e.from),t=nodeById(e.to);
+  const sib=M.edges.filter(x=>x.from===e.from&&(f.type==='source'||x.fromTask===e.fromTask));const tot=sib.reduce((s,x)=>s+(+x.prob||0),0);
+  let h=`<div class="ih"><span class="ico" style="background:var(--panel3);color:var(--ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12h13M13 7l5 5-5 5"/></svg></span><div style="flex:1;min-width:0"><h3>${esc(e.label||'Connection')}</h3><small>${esc(f.name)} → ${esc(t.name)}</small></div></div>`;
+  h+=`<div class="sec"><div class="st">Handoff</div><div class="g2">${F(B,'Label',e,'label',{type:'text',full:true})}
+    ${f.type==='dept'?S(B,`After task in ${f.name}`,e,'fromTask',f.tasks.map(x=>[x.id,x.name]),{re:1,full:true,hint:'The line fires when this task finishes'}):''}
+    ${t.type==='dept'?S(B,`Next task in ${t.name}`,e,'toTask',t.tasks.map(x=>[x.id,x.name]),{re:1,full:true,hint:'The work item joins this task’s queue'}):''}
+    ${S(B,'Line type',e,'type',[['normal','Normal handoff'],['win','Win (scaled by win-rate scenario)'],['loss','Loss'],['rework','Rework / defect loop']],{re:1,full:true})}
+    </div></div>`;
+  h+=`<div class="sec"><div class="st">Weight & attributes</div><div class="g2">
+    ${F(B,'Routing weight',e,'prob',{unit:'%',min:0,hint:'Share of jobs leaving this task that take this line. Sibling lines are normalised to 100%.'})}
+    ${F(B,'Priority at destination',e,'priority',{min:1,max:5,hint:'1–5. Higher-priority work is pulled from the destination queue first.'})}
+    ${F(B,'Handoff cost per job',e,'cost',{unit:'$',min:0,hint:'Cost incurred each time a job crosses — freight, courier, review meeting, bank fee'})}
+    ${F(B,'Transfer delay',e,'delay',{unit:'days',min:0,step:0.5,hint:'Time in transit before the next team can start'})}
+    ${F(B,'Business importance',e,'importance',{min:1,max:5,hint:'1–5. Combined with flow volume to rank the critical handoffs.'})}
+    </div>${sib.length>1?`<div class="${Math.abs(tot-100)>0.5?'warnbox':'infobox'}" style="margin-top:10px">This task has ${sib.length} outgoing lines, weights sum to ${fmtN(tot,1)}%${Math.abs(tot-100)>0.5?' — they will be normalised to 100% in the simulation.':'.'}</div>`:''}</div>`;
+  if(RES){const fl=RES.A.edgeFlow[e.id]||0;h+=`<div class="sec"><div class="st">Simulation results${RES.stale?' <span class="pill p-warn">stale</span>':''}</div><div class="kv"><span>Jobs crossing / yr</span><b>${fmtN(fl,1)}</b><span>Handoff cost / yr</span><b>${fmt$(fl*(+e.cost||0))}</b><span>Criticality (flow × importance)</span><b>${fmtN(fl*(+e.importance||3),0)}</b></div></div>`;}
+  h+=`<div class="sec" style="display:flex;gap:8px"><button class="btn sm" data-act="goNode" data-id="${f.id}">← ${esc(f.name)}</button><button class="btn sm" data-act="goNode" data-id="${t.id}">${esc(t.name)} →</button></div>`;
+  insp.innerHTML=h;
+}
+
+/* =====================================================================
+   Assumptions page (scenario drivers)
+   ===================================================================== */
+const PRESETS={
+  'Baseline':{demand:0,winShift:0,leadLoss:0,price:0,material:0,salaryInfl:0,absent:4,reworkMult:1,supplyDelay:0},
+  'Boom: +30% tenders':{demand:30,winShift:0,leadLoss:0,price:3,material:4,salaryInfl:4,absent:4,reworkMult:1,supplyDelay:7},
+  'Recession':{demand:-25,winShift:-5,leadLoss:5,price:-10,material:-3,salaryInfl:1,absent:4,reworkMult:1,supplyDelay:0},
+  'Supply shock':{demand:0,winShift:0,leadLoss:0,price:0,material:15,salaryInfl:2,absent:4,reworkMult:1.2,supplyDelay:35},
+  'Quality crisis':{demand:0,winShift:-3,leadLoss:0,price:0,material:0,salaryInfl:0,absent:6,reworkMult:2.5,supplyDelay:0},
+};
+const vSc=$('#v-scenario');
+wireBinder(vSc,SB,(el,type)=>{if(type==='input'&&el.closest('.drv')){SC.preset='Custom';$$('.presets .btn',vSc).forEach(b=>b.classList.toggle('on',b.dataset.p==='Custom'));}save();invalidate();});
+vSc.addEventListener('click',ev=>{const p=ev.target.closest('[data-p]');if(p&&PRESETS[p.dataset.p]){Object.assign(SC,PRESETS[p.dataset.p]);SC.preset=p.dataset.p;save();invalidate();renderScenario();}
+  const a=ev.target.closest('[data-act]');if(!a)return;
+  if(a.dataset.act==='aiAll'){let k=0;M.nodes.filter(n=>n.type==='dept').forEach(n=>n.tasks.forEach(t=>{const [rec]=aiRec(aiScore(t));const m=rec==='Automate'?'automate':rec.startsWith('Augment')?'augment':'off';if(t.aiMode!==m){t.aiMode=m;k++;}}));save();invalidate();renderNodes();toast(`AI plan applied to ${k} task(s) — run the simulation to compare.`);}
+  if(a.dataset.act==='aiNone'){M.nodes.filter(n=>n.type==='dept').forEach(n=>n.tasks.forEach(t=>t.aiMode='off'));save();invalidate();renderNodes();toast('AI switched off on every task.');}});
+function renderScenario(){
+  SB.reset();const B=SB;
+  vSc.innerHTML=`<h2>Assumptions & scenarios</h2><p class="lead">External drivers that push on the business from outside — market demand, lost leads, prices, supply, quality. They sit on top of the process model, so you can test “what if tenders grow 30%?” without redrawing anything. Pick a preset or tune each driver, then run the Monte Carlo.</p>
+  <div class="presets">${Object.keys(PRESETS).map(p=>`<button class="btn sm${SC.preset===p?' on':''}" data-p="${p}">${p}</button>`).join('')}<button class="btn sm${SC.preset==='Custom'?' on':''}" data-p="Custom" disabled>Custom</button></div>
+  <div class="grid">
+   <div class="card c8 drv"><h4>Market & commercial drivers</h4><p class="cs">Applied to every input and win / loss line in the model.</p><div class="scgrid">
+    ${R(B,'Demand change (all inputs)',SC,'demand',-50,100,5,{unit:'%',hint:'e.g. +30% more tenders / proposals'})}
+    ${R(B,'Win-rate shift',SC,'winShift',-20,20,1,{unit:' pp',hint:'Added to every “win” line; “loss” lines absorb the difference'})}
+    ${R(B,'Leads lost before contact',SC,'leadLoss',0,40,1,{unit:'%',hint:'Share of incoming work lost outside your control — slow response, bad data, churn'})}
+    ${R(B,'Contract value / price change',SC,'price',-30,30,1,{unit:'%'})}
+    ${R(B,'Material & supplier cost change',SC,'material',-20,40,1,{unit:'%'})}
+    ${R(B,'Supplier delay',SC,'supplyDelay',0,90,1,{unit:' days',hint:'Added to every task flagged as supplier-dependent'})}
+   </div></div>
+   <div class="card c4 drv"><h4>People & quality</h4><p class="cs">Internal frictions.</p><div style="display:grid;gap:12px">
+    ${R(B,'Salary inflation',SC,'salaryInfl',0,15,0.5,{unit:'%'})}
+    ${R(B,'Absenteeism / sick leave',SC,'absent',0,20,0.5,{unit:'%',hint:'Removes capacity from every team'})}
+    ${R(B,'Rework / defect multiplier',SC,'reworkMult',0,4,0.1,{unit:'×',hint:'Scales every task rework % and every rework line'})}
+   </div></div>
+   <div class="card c6"><h4>AI economics</h4><p class="cs">Used when a task’s AI mode is Augment or Automate, and to size savings in Insights.</p><div class="g2">
+    ${F(B,'Effort cut — augment (copilot)',SC,'augRed',{unit:'%'})}${F(B,'Effort cut — automate (agent)',SC,'autoRed',{unit:'%'})}
+    ${F(B,'Copilot seat cost',SC,'aiSeat',{unit:'$/FTE/mo'})}${F(B,'Automation run cost',SC,'aiAutomate',{unit:'$/task/mo'})}</div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn sm" data-act="aiAll">Apply recommended AI plan to all tasks</button><button class="btn sm" data-act="aiNone">All tasks human-only</button></div></div>
+   <div class="card c3"><h4>Company overhead</h4><p class="cs">People and cost not inside a modelled department.</p><div style="display:grid;gap:8px">
+    ${F(B,'G&A headcount (CEO, HR, admin)',SC,'gaHead',{min:0})}${F(B,'G&A cost incl. rent & insurance',SC,'gaCost',{unit:'$/yr'})}</div></div>
+   <div class="card c3"><h4>Monte Carlo settings</h4><p class="cs">12-month window, daily steps, after a 12-month warm-up so pipelines are full.</p><div style="display:grid;gap:8px">
+    ${F(B,'Replications',SC,'runs',{min:20,max:1000,step:10})}${F(B,'Random seed',SC,'seed',{min:1})}</div></div>
+  </div>
+  <p class="foot">Method: each replication simulates 730 days (365 warm-up + 365 measured). Arrivals are Poisson with monthly volatility, seasonality and growth; effort is triangular (min / most likely / max); routing, rework and contract values are random. Capacity per day = FTE × hours × productive % × (1 − absenteeism), shared across up to “WIP” parallel jobs; work is pulled by line priority, then first-in-first-out.</p>`;
+}
+
+/* =====================================================================
+   Run: Monte Carlo
+   ===================================================================== */
+async function runMC(){
+  const errs=validate();if(errs.length){toast(errs[0]);return false;}const w0=curWs();RUNNING=true;
+  const bt=$('#btnRun');bt.disabled=true;const pg=$('#prog');pg.style.display='block';
+  const runs=clamp(Math.round(+SC.runs||200),20,1000);
+  const t0=performance.now();
+  const raw=await monteCarlo(M,SC,runs,p=>pg.firstElementChild.style.width=(p*100)+'%');
+  const A=aggregate(raw);RES={A,an:analyse(A),raw,stale:false,sc:clone(SC),ms:performance.now()-t0,when:new Date()};
+  pg.style.display='none';bt.disabled=false;w0.RES=RES;RUNNING=false;
+  if(curWs()!==w0)return true;
+  renderNodes();renderInspector();renderInsights();$('#resReady').classList.add('on');
+  toast(`${runs} simulated years done — watch one of them play live, insights are below`);
+  return true;
+}
+function validate(){const e=[];if(!M.nodes.some(n=>n.type==='source'))e.push('Add at least one Input so work enters the business.');
+  if(!M.nodes.some(n=>n.type==='outcome'&&n.kind==='revenue'))e.push('Add a Revenue outcome so completed work turns into revenue.');return e;}
+async function runAll(){if(live)stopLive(true);const ok=await runMC();if(ok&&RES&&$('#v-model').classList.contains('on'))startLive();}
+$('#btnRun').onclick=runAll;
+$('#resReady').onclick=()=>{$('#resReady').classList.remove('on');$('#results').scrollIntoView({behavior:'smooth'});};
+
+/* =====================================================================
+   Run: Live animation (one replication, tokens flowing on the canvas)
+   ===================================================================== */
+let live=null;
+function startLive(){
+  const errs=validate();if(errs.length){toast(errs[0]);return;}
+  showView('model');stopLive(true);
+  const tokens=[];
+  const sim=new Sim(M,SC,{seed:Date.now()%100000,days:365,warmup:0,visual:(e,d,delay,job)=>{if(live&&live.tokens.length<500)live.tokens.push({e:e.id,t0:d+Math.random()*0.6,dur:Math.max(delay,0),c:job.color||'#fff',type:e.type});}});
+  live={sim,t:0,last:performance.now(),running:true,speed:+$('#liveSpeed').value,tokens};
+  canvas.classList.add('live-on');$('#hud').style.display='flex';$('#tip0').style.display='none';$('#liveToggle').textContent='Pause';
+  requestAnimationFrame(liveTick);
+}
+function stopLive(silent){if(!live)return;live.running=false;live=null;tokSvg.innerHTML='';canvas.classList.remove('live-on');$('#hud').style.display='none';if(!silent)renderNodes();}
+function liveTick(ts){if(!live)return;
+  const dt=Math.min(0.1,(ts-live.last)/1000);live.last=ts;
+  if(live.running){live.t+=dt*live.speed;const sim=live.sim;while(sim.d<Math.floor(live.t)&&sim.d<sim.T)sim.step();
+    if(sim.d>=sim.T){live.running=false;$('#liveToggle').textContent='Replay';toast('Simulated year complete — run the Monte Carlo for statistics across hundreds of years.');}}
+  drawTokens();drawLiveNodes();
+  requestAnimationFrame(liveTick);}
+function drawTokens(){const L=live;const minVis=0.45*L.speed;let h='';const keep=[];
+  for(const k of L.tokens){const dur=Math.max(k.dur,minVis);const f=(L.t-k.t0)/dur;if(f>1)continue;keep.push(k);if(f<0)continue;
+    const p=edgePath[k.e];if(!p)continue;const len=p.getTotalLength();const pt=p.getPointAtLength(len*f);
+    const col=k.type==='win'?'#3ecf8e':k.type==='loss'?'#ff5c63':k.type==='rework'?'#f5b83d':k.c;
+    h+=`<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${(13/Math.sqrt(view.k)).toFixed(1)}" fill="${col}" opacity=".25"/><circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${(6/Math.sqrt(view.k)).toFixed(1)}" fill="${col}"/>`;}
+  L.tokens=keep;tokSvg.innerHTML=h;}
+function drawLiveNodes(){const s=live.sim;
+  for(const n of s.depts){const st=s.ns[n.id];const el=nodesEl.querySelector(`[data-id="${n.id}"]`);if(!el)continue;
+    const b=el.querySelectorAll('.live b');b[0].textContent='Q '+st.q.length;b[1].textContent='▶ '+st.act.length;b[2].textContent='⏳ '+st.waits.length;
+    const u=st.todayUtil;const bar=el.querySelector('.ub i');if(bar){bar.style.width=Math.min(100,u*100)+'%';bar.style.background=u>=0.95?'var(--bad)':u>=0.6?'var(--warn)':'var(--good)';}
+    const uv=el.querySelector('.uv');if(uv)uv.textContent=pct(u);}
+  $('#hDay').textContent=`D${s.d} · ${dayLabel(s.d)}`;$('#hRev').textContent=fmt$(s.o.revenue);$('#hWon').textContent=s.o.won;$('#hWip').textContent=s.wip();
+  let drops=0;for(const id in s.ns)drops+=s.ns[id].drops;$('#hLost').textContent=s.o.lostAll;}
+$('#liveToggle').onclick=()=>{if(!live)return;if(live.sim.d>=live.sim.T){startLive();return;}live.running=!live.running;$('#liveToggle').textContent=live.running?'Pause':'Resume';};
+$('#liveStop').onclick=()=>stopLive();
+$('#liveSpeed').oninput=ev=>{const v=+ev.target.value;$('#liveSpeedV').textContent=v+' d/s';if(live)live.speed=v;};
+
+/* =====================================================================
+   Insights dashboard
+   ===================================================================== */
+const vIn=$('#results');const charts={};
+if(window.Chart){Chart.defaults.color='#a2a2b3';Chart.defaults.borderColor='#2e2e38';Chart.defaults.font.family='Inter, system-ui, sans-serif';Chart.defaults.font.size=11.5;Chart.defaults.plugins.legend.labels.boxWidth=12;}
+function mk(id,cfg){if(!window.Chart)return;if(charts[id])charts[id].destroy();const c=document.getElementById(id);if(c)charts[id]=new Chart(c,cfg);}
+function hist(arr,bins=22,fmt=v=>v){if(!arr.length)return{labels:[],counts:[]};let lo=quant(arr,0.005),hi=quant(arr,0.995);if(hi<=lo)hi=lo+1;const w=(hi-lo)/bins;const c=new Array(bins).fill(0);
+  arr.forEach(v=>{const i=clamp(Math.floor((v-lo)/w),0,bins-1);c[i]++;});return{labels:c.map((_,i)=>fmt(lo+w*(i+0.5))),counts:c,lo,w};}
+const tickMoney={callback:v=>fmt$(v)};
+const HELP=t=>`<span class="help" data-tip="${esc(t)}">?</span>`;
+document.addEventListener('mouseover',ev=>{const h=ev.target.closest&&ev.target.closest('.help');if(h)h.classList.toggle('flip',h.getBoundingClientRect().left>innerWidth-310);});
+const INS=(t,id)=>`<p class="ins"${id?` id="${id}"`:''}><b class="il">Insight</b>${t}</p>`;
+function renderInsights(){
+  if(!RES){vIn.innerHTML=`<div style="display:flex;align-items:center;gap:16px;color:var(--muted)"><h2 style="color:var(--ink);margin:0">Insights</h2><span>Press <b>Run simulation</b> — 200 simulated years run in about a second and the results appear right here.</span></div>`;return;}
+  const A=RES.A,an=RES.an;const depts=an.rows;const srcs=M.nodes.filter(n=>n.type==='source');
+  const mainSrc=srcs.slice().sort((a,b)=>(A.revBySrc[b.id]||0)-(A.revBySrc[a.id]||0))[0];
+  const k=(t,v,r,col,tip)=>`<div class="card c3 kpi"><div class="k">${t}${HELP(tip)}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div><div class="r">${r}</div></div>`;
+  const cyc=mainSrc&&A.cycle[mainSrc.id]||[];
+  const findings=buildFindings(A,an);
+  // one-sentence insights
+  const byU=depts.slice().sort((a,b)=>b.x.util.p50-a.x.util.p50);const hot=byU.filter(r=>r.x.util.p50>=0.85),cold=byU[byU.length-1];
+  const iUtil=!byU.length?'':hot.length?`${hot.map(r=>`<b>${esc(r.n.name)}</b> (${pct(r.x.util.p50)})`).join(' and ')} ${hot.length>1?'run':'runs'} above the 85% danger line, while ${esc(cold.n.name)} (${pct(cold.x.util.p50)}) has the most spare capacity to lend.`:`No team runs above 85% — ${esc(byU[0].n.name)} is the busiest at ${pct(byU[0].x.util.p50)}, so the business can grow before it needs to hire.`;
+  const hires=depts.filter(r=>r.hire>0),hireCost=hires.reduce((s,r)=>s+r.hireCost,0);
+  const iTable=hires.length?`Getting every team to an 80% load takes ${hires.reduce((s,r)=>s+r.hire,0)} hire(s) costing ${fmt$(hireCost)}/yr, against ≈ ${fmt$(A.dropExp.p50)} of expected revenue lost to deadlines today — start with <b>${esc((an.bott||hires[0]).n.name)}</b>.`:'Every team absorbs current demand below 80% load — no hiring is needed under these assumptions.';
+  const c=A.costs,rev=A.rev.mean,prof=rev-c.mat-c.pay-c.ovh-c.ga-c.handoff-c.ai;
+  const iWater=rev>0?`Materials take ${pct(c.mat/rev)} of revenue and payroll ${pct(c.pay/rev)}, leaving ${pct(prof/rev)} as profit — ${c.mat>c.pay?'supplier prices and deal pricing move profit more than headcount does':'people cost is the main profit lever'}.`:'No revenue was generated — check that work can reach a revenue outcome.';
+  const cr=depts.slice().sort((a,b)=>b.cost-a.cost);
+  const iCost=cr.length?`<b>${esc(cr[0].n.name)}</b> carries ${pct(cr[0].cost/A.cost.mean)} of total cost, ${cr[0].x.mat>cr[0].x.pay?'mostly materials':'mostly payroll'}; ${esc(cr[cr.length-1].n.name)} is the cheapest team at ${fmt$(cr[cr.length-1].cost)}/yr.`:'';
+  const aiTop=an.ai.filter(x=>x.saving>0&&x.t.aiMode==='off'),freed=aiTop.reduce((s,x)=>s+x.freed,0),onAI=an.ai.filter(x=>x.t.aiMode!=='off').length,nHum=an.ai.filter(x=>x.rec==='Keep human').length;
+  const iAI=aiTop.length?`Putting AI on the ${aiTop.length} suitable task(s) frees ≈ ${fmtN(freed,0)} hours a year (≈ ${fmtN(freed/1500,1)} FTE)${an.bott&&aiTop.some(x=>x.n.id===an.bott.n.id)?`, including time inside the bottleneck (${esc(an.bott.n.name)})`:''}, while ${nHum} task(s) should stay with people.`:onAI?`AI is already switched on for ${onAI} task(s); the remaining ${nHum} task(s) are best kept human.`:'No task scores high enough for AI — the work here is judgement-heavy or physical.';
+  const h0=an.hand[0],hc=an.hand.slice().sort((a,b)=>b.cost-a.cost)[0];
+  const iHand=h0?`“${esc(h0.e.label||'—')}” (${esc(nodeById(h0.e.from).name)} → ${esc(nodeById(h0.e.to).name)}) is the most critical handoff at ${fmtN(h0.flow,0)} jobs/yr × importance ${h0.e.importance}${hc&&hc.cost>0?`; the costliest is “${esc(hc.e.label||'—')}” at ${fmt$(hc.cost)}/yr`:''}.`:'';
+  const neg=A.margin.all.filter(v=>v<0).length/A.n;
+  const iRev=`In 8 of 10 simulated years revenue lands between ${fmt$(A.rev.p10)} and ${fmt$(A.rev.p90)} — about ±${pct((A.rev.p90-A.rev.p10)/2/Math.max(1,A.rev.p50))} around the median of ${fmt$(A.rev.p50)}.`;
+  const iMar=`The median year earns a ${pct(A.margin.p50,1)} margin and ${neg>0?`${pct(neg,0)} of years lose money`:'no simulated year loses money'} — ${A.margin.p10<0.05?'the downside buffer is thin':'there is a healthy buffer in bad years'}.`;
+  vIn.innerHTML=`<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:16px"><div style="flex:1;min-width:300px"><h2>Insights — ${esc(M.name)}</h2>
+    <p class="lead" style="margin:0">${A.n} simulated years · scenario <b>${esc(RES.sc.preset)}</b> · ranges are P10–P90 (80% of simulated outcomes fall inside).</p></div>
+    <span id="staleNote" class="pill p-warn" style="${RES.stale?'':'display:none'}">Model changed since this run — re-run to refresh</span>
+    <button class="btn" id="btnTop">↑ Workflow</button><button class="btn" id="btnSnap">Save as scenario</button><button class="btn" id="btnSens">Run sensitivity</button></div>
+  <div class="grid">
+    ${k('Revenue / yr',fmt$(A.rev.p50),`${fmt$(A.rev.p10)} – ${fmt$(A.rev.p90)}`,null,'Median (P50) annual revenue across all simulated years. The small line is the P10–P90 range: 8 in 10 years fall inside it.')}
+    ${k('Operating margin',pct(A.margin.p50,1),`${pct(A.margin.p10,1)} – ${pct(A.margin.p90,1)} · profit ${fmt$(A.profit.p50)}`,A.margin.p50<0?'var(--bad)':A.margin.p50<0.08?'var(--warn)':'var(--good)','(Revenue − all costs) ÷ revenue. Costs = payroll, materials, department overheads, handoff costs, AI tools and company G&A.')}
+    ${k('Revenue per employee',fmt$(A.rpe.p50),`${fmtN(A.head,1)} people incl. ${SC.gaHead} G&A`,null,'Revenue divided by total headcount (team members, managers and G&A staff) — a standard productivity benchmark to compare with your industry.')}
+    ${k('Total cost / yr',fmt$(A.cost.p50),`${fmt$(A.cost.p10)} – ${fmt$(A.cost.p90)}`,null,'All annual costs: payroll, materials, department overheads, handoff costs, AI tooling and company G&A.')}
+    ${k('Revenue jobs completed',fmtN(A.won.p50,0),`${fmtN(A.won.p10,0)} – ${fmtN(A.won.p90,0)} per year`,null,'Jobs from all inputs that reached a revenue outcome inside the measured year.')}
+    ${k(`${esc(mainSrc?mainSrc.name:'Main input')} → cash`,cyc.length?fmtN(quant(cyc,.5),0)+' days':'—',cyc.length?`P90 ${fmtN(quant(cyc,.9),0)} days`:'no completions',null,'Median days from a job arriving (e.g. a tender) until its revenue is collected, for your largest revenue input.')}
+    ${k('Leads lost to capacity',fmtN(A.dropN.p50,0),`≈ ${fmt$(A.dropExp.p50)} expected revenue lost`,A.dropN.p50>0?'var(--bad)':null,'Jobs dropped because they waited in a queue longer than the task deadline — a direct cost of missing capacity. Expected revenue weights each job by its chance of becoming revenue.')}
+    ${k('Primary bottleneck',an.bott?esc(an.bott.n.name):'None',an.bott?`${pct(an.bott.x.util.p50)} utilised · ${fmtN(an.bott.x.avgWait,1)} d avg wait`:'all teams below 80% load',an.bott?'var(--bad)':'var(--good)','The department that limits the output of the whole business: highest bottleneck score among teams at ≥80% load or losing leads.')}
+
+    <div class="card c7"><h4>Diagnosis${HELP('Findings generated automatically from the simulation, ordered by importance: constraint, hiring, spare capacity, biggest cost, AI opportunity, what to keep human, and risk.')}</h4><p class="cs">What the simulation says, in priority order.</p>${findings}</div>
+    <div class="card c5"><h4>Capacity load by department${HELP('Share of available productive hours actually used, per department. The bar spans P10–P90 across simulated years, the white dot is the median. Above ~85% load, waiting time rises sharply.')}</h4><p class="cs">Bar = P10–P90 utilisation across runs, dot = P50.</p><div class="chartbox tall"><canvas id="chUtil"></canvas></div>${INS(iUtil)}</div>
+
+    <div class="card c12"><h4>Bottleneck & staffing table${HELP('Per-department operating view: load, jobs waiting, days work waits before it starts, output, leads lost, and the FTE needed to run at a healthy 80% load. Score = load 60% + share of all waiting 25% + revenue lost to deadlines 15%.')}</h4><p class="cs">Hiring target is 80% load.</p>
+      <div style="overflow-x:auto"><table class="t" style="min-width:980px"><tr><th>Department</th><th>Load</th><th class="n">Util P50</th><th class="n">Avg queue</th><th class="n">Avg wait</th><th class="n">Jobs / yr</th><th class="n">Lost leads</th><th class="n">FTE now → needed</th><th class="n">Cost / yr</th><th class="n">Cost / job</th><th>Recommendation</th></tr>
+      ${depts.map(r=>{const x=r.x,u=x.util.p50,col=u>=0.85?'var(--bad)':u>=0.6?'var(--warn)':'var(--good)';
+        const rec=r.hire>0?`<span class="pill p-bad">Hire +${r.hire} ${esc(r.topRole?r.topRole.role:'')}</span>`:r.slack>0?`<span class="pill p-aug">Slack ≈ ${r.slack} FTE</span>`:`<span class="pill p-ok">Balanced</span>`;
+        return`<tr><td><b>${esc(r.n.name)}</b>${an.bott&&an.bott.n.id===r.n.id?' <span class="pill p-bad">bottleneck</span>':''}</td><td><div class="bar"><i style="width:${Math.min(100,u*100)}%;background:${col}"></i></div></td>
+        <td class="n">${pct(u)}</td><td class="n">${fmtN(x.avgQ,1)}</td><td class="n">${fmtN(x.avgWait,1)} d</td><td class="n">${fmtN(x.done,0)}</td><td class="n">${x.drops>0.05?fmtN(x.drops,1):'—'}</td>
+        <td class="n">${fmtN(x.fte,1)} → ${fmtN(r.reqFte,1)}</td><td class="n">${fmt$(r.cost)}</td><td class="n">${x.done?fmt$(r.cost/x.done):'—'}</td><td>${rec}</td></tr>`;}).join('')}</table></div>${INS(iTable)}</div>
+
+    <div class="card c6"><h4>Queue over the year${HELP('Average number of jobs waiting (not yet started) in the selected department, week by week. Line = mean across runs, shaded band = P10–P90. Peaks show when seasonality overwhelms capacity.')}</h4><p class="cs">Weekly jobs waiting. <select class="mini" id="qSel">${depts.map(r=>`<option value="${r.n.id}"${an.bott&&an.bott.n.id===r.n.id?' selected':''}>${esc(r.n.name)}</option>`).join('')}</select></p><div class="chartbox"><canvas id="chQueue"></canvas></div>${INS('','qIns')}</div>
+    <div class="card c6"><h4>Arrival-to-cash cycle time${HELP('Histogram of how many days each completed job took from arriving (tender, ticket, lead) to revenue being collected, pooled across every simulated year.')}</h4><p class="cs">Days from arrival to revenue. <select class="mini" id="cSel">${srcs.map(s=>`<option value="${s.id}"${mainSrc&&s.id===mainSrc.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select></p><div class="chartbox"><canvas id="chCycle"></canvas></div>${INS('','cIns')}</div>
+
+    <div class="card c6"><h4>Annual revenue distribution${HELP('How annual revenue varies across all Monte Carlo runs. A wide spread means an unpredictable business; a narrow one means stable, forecastable revenue.')}</h4><p class="cs">${A.n} simulated years.</p><div class="chartbox"><canvas id="chRev"></canvas></div>${INS(iRev)}</div>
+    <div class="card c6"><h4>Operating margin distribution${HELP('How operating margin varies across runs. Red bars are loss-making years — their share is the probability of losing money in a given year.')}</h4><p class="cs">Probability of margin below zero: <b>${pct(neg,1)}</b></p><div class="chartbox"><canvas id="chMargin"></canvas></div>${INS(iMar)}</div>
+
+    <div class="card c5"><h4>Revenue to profit${HELP('Waterfall: starts from average annual revenue and subtracts each type of cost to arrive at operating profit.')}</h4><p class="cs">Average simulated year.</p><div class="chartbox tall"><canvas id="chWater"></canvas></div>${INS(iWater)}</div>
+    <div class="card c7"><h4>Where the money goes${HELP('Annual cost of each department, split into payroll (incl. manager), materials / direct cost per job, overheads and AI tooling.')}</h4><p class="cs">Annual cost by department.</p><div class="chartbox tall"><canvas id="chCost"></canvas></div>${INS(iCost)}</div>
+
+    <div class="card c12"><h4>AI or humans? Task-level automation map${HELP('Each bubble is a task. X = AI suitability score (high when repetitive, data is digital, low judgement, little client contact, not physical). Y = labour value spent on it per year. Size = hours per year. Top-right bubbles are the best AI candidates.')}</h4><p class="cs">Savings are <i>capacity freed</i>, not cash, unless headcount or hiring changes.</p>
+      <div class="grid" style="gap:14px"><div class="c5" style="grid-column:span 5"><div class="chartbox tall"><canvas id="chAI"></canvas></div></div>
+      <div style="grid-column:span 7;overflow-x:auto"><table class="t" style="min-width:620px"><tr><th>Task</th><th>Department</th><th class="n">Score</th><th>Recommendation</th><th class="n">Hours / yr</th><th class="n">Labour value</th><th class="n">Capacity freed</th><th>Now</th></tr>
+      ${an.ai.map(x=>`<tr><td>${esc(x.t.name)}</td><td style="color:var(--muted)">${esc(x.n.name)}</td><td class="n">${x.score}</td><td><span class="pill ${x.cls}">${x.rec}</span></td><td class="n">${fmtN(x.hours,0)}</td><td class="n">${fmt$(x.labor)}</td><td class="n">${x.saving?fmt$(x.saving):'—'}</td><td>${x.t.aiMode==='off'?'<span style="color:var(--dim)">human</span>':`<span class="pill p-aug">${x.t.aiMode}</span>`}</td></tr>`).join('')}</table>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button class="btn sm" id="aiPlan">Apply recommended AI plan & re-run</button><span style="font-size:12px;color:var(--dim)">Save the current run as a scenario first to compare before / after.</span></div></div></div>${INS(iAI)}</div>
+
+    <div class="card c6"><h4>Critical handoffs${HELP('Lines between teams ranked by jobs crossing × business importance. A delay or error on the top lines hurts most. Priority decides which work the receiving team picks first.')}</h4><p class="cs">Ranked by flow × importance.</p><table class="t"><tr><th>Handoff</th><th class="n">Jobs / yr</th><th class="n">Importance</th><th class="n">Priority</th><th class="n">Cost / yr</th></tr>
+      ${an.hand.slice(0,9).map(h=>{const f=nodeById(h.e.from),t=nodeById(h.e.to);return`<tr><td>${esc(h.e.label||'—')}<div style="color:var(--dim);font-size:11.5px">${esc(f?f.name:'')} → ${esc(t?t.name:'')}</div></td><td class="n">${fmtN(h.flow,1)}</td><td class="n">${h.e.importance}</td><td class="n">${h.e.priority}</td><td class="n">${h.cost?fmt$(h.cost):'—'}</td></tr>`;}).join('')}</table>${INS(iHand)}</div>
+    <div class="card c6"><h4>Sensitivity — what moves profit most${HELP('Tornado chart: each assumption is set to a low and a high value while everything else stays fixed (150 runs each). Bars show the change in mean profit — the longest bars are the assumptions worth managing or researching most.')}</h4><p class="cs">Press <b>Run sensitivity</b> (≈ 8 s).</p><div class="chartbox tall" id="sensBox"><canvas id="chSens"></canvas></div>${INS('Press Run sensitivity to see which assumption moves profit most.','sensIns')}</div>
+
+    <div class="card c12"><h4>Scenario comparison${HELP('Saved runs side by side, e.g. Baseline vs Boom vs AI plan vs +2 engineers. Differences are shown against the first (base) scenario.')}</h4><p class="cs">Save runs as scenarios to compare them.</p><div id="snapTbl"></div>${INS('','snapIns')}</div>
+  </div>
+  <p class="foot">Demo model. All figures come from the assumptions entered in the model — nothing here is measured company data. Run took ${(RES.ms/1000).toFixed(1)}s · ${RES.when.toLocaleTimeString()}.</p>`;
+  drawCharts();renderSnaps();
+  $('#btnTop').onclick=()=>$('#v-model').scrollTo({top:0,behavior:'smooth'});
+  $('#btnSnap').onclick=()=>{const name=prompt('Name this scenario',`${RES.sc.preset}${M.nodes.some(n=>n.tasks&&n.tasks.some(t=>t.aiMode!=='off'))?' + AI':''}`);if(!name)return;
+    SNAPS.push({name,rev:A.rev.p50,cost:A.cost.p50,profit:A.profit.p50,margin:A.margin.p50,marginP10:A.margin.p10,rpe:A.rpe.p50,head:A.head,won:A.won.p50,drops:A.dropN.p50,bott:an.bott?an.bott.n.name:'None',
+      cycle:cyc.length?quant(cyc,.5):0});save();renderSnaps();toast('Scenario saved');};
+  $('#btnSens').onclick=runSens;
+  $('#aiPlan').onclick=()=>{M.nodes.filter(n=>n.type==='dept').forEach(n=>n.tasks.forEach(t=>{const [rec]=aiRec(aiScore(t));t.aiMode=rec==='Automate'?'automate':rec.startsWith('Augment')?'augment':'off';}));save();renderNodes();runMC();};
+  $('#qSel').onchange=drawQueue;$('#cSel').onchange=drawCycle;
+  if(RES.sens)drawSens();
+}
+function buildFindings(A,an){
+  const out=[];const F=(c,ic,t,p)=>out.push(`<div class="finding"><span class="fi" style="background:${c}22;color:${c}">${ic}</span><div><b>${t}</b><p>${p}</p></div></div>`);
+  if(an.bott){const b=an.bott,x=b.x;F('#ff5c63','!',`${esc(b.n.name)} is the constraint`,`Runs at ${pct(x.util.p50)} load (P90 ${pct(x.util.p90)}). Work waits ${fmtN(x.avgWait,1)} days on average before anyone starts it${x.drops>0.05?`, and ${fmtN(x.drops,1)} jobs a year miss their deadline — about ${fmt$(x.dropExp)} of expected revenue`:''}. Every hour lost here is lost for the whole business.`);}
+  const hires=an.rows.filter(r=>r.hire>0);
+  if(hires.length)F('#f5b83d','+','Hiring',hires.map(r=>`<b>${esc(r.n.name)}</b>: +${r.hire} ${esc(r.topRole?r.topRole.role:'FTE')} (${fmt$(r.hireCost)}/yr)`).join(' · ')+'. Use “Apply +N FTE” on the node, re-run and compare the saved scenarios to check the payback.');
+  const slack=an.rows.filter(r=>r.slack>0);
+  if(slack.length)F('#5fb0c9','~','Spare capacity',slack.map(r=>`<b>${esc(r.n.name)}</b> ${pct(r.x.util.p50)} load (≈${r.slack} FTE spare)`).join(' · ')+' — cross-train into the bottleneck, or absorb growth here first.');
+  const top=an.rows.slice().sort((a,b)=>b.cost-a.cost)[0];
+  if(top)F('#9b7bff','$',`Biggest cost centre: ${esc(top.n.name)}`,`${fmt$(top.cost)} a year (${pct(top.cost/A.cost.p50)} of total cost), of which ${fmt$(top.x.mat)} is materials and ${fmt$(top.x.pay)} payroll.`);
+  const ai=an.ai.filter(x=>x.saving>0&&x.t.aiMode==='off').slice(0,3);
+  if(ai.length)F('#3ecf8e','⚡','AI opportunity',ai.map(x=>`<b>${esc(x.t.name)}</b> (${esc(x.n.name)}) — ${x.rec.toLowerCase()}, frees ≈ ${fmtN(x.freed,0)} h/yr`).join(' · ')+'.');
+  const hum=an.ai.filter(x=>x.rec==='Keep human').map(x=>x.t.name);
+  if(hum.length)F('#bba6ff','H','Keep human',`${hum.slice(0,5).map(esc).join(', ')} — high judgement, client contact or physical work. Invest in people and tools here, not replacement.`);
+  if(A.margin.p10<0)F('#ff5c63','↓','Downside risk',`In the worst 10% of years margin falls below ${pct(A.margin.p10,1)}. Revenue swings between ${fmt$(A.rev.p10)} and ${fmt$(A.rev.p90)}.`);
+  if(A.unrouted.p50>0)F('#f5b83d','?','Model gap',`${fmtN(A.unrouted.p50,0)} jobs a year finish a task with no outgoing line — connect them to a next step or an outcome.`);
+  return out.join('')||'<p class="cs">No issues found.</p>';
+}
+function drawCharts(){
+  const A=RES.A,an=RES.an;const rows=an.rows.slice().sort((a,b)=>b.x.util.p50-a.x.util.p50);
+  mk('chUtil',{data:{labels:rows.map(r=>r.n.name),datasets:[
+    {type:'bar',label:'P10–P90',data:rows.map(r=>[r.x.util.p10*100,Math.max(r.x.util.p90*100,r.x.util.p10*100+1)]),backgroundColor:rows.map(r=>r.x.util.p50>=0.85?'#ff5c6399':r.x.util.p50>=0.6?'#f5b83d99':'#3ecf8e99'),borderRadius:4,barPercentage:0.7},
+    {type:'scatter',label:'P50',data:rows.map((r,i)=>({x:r.x.util.p50*100,y:r.n.name})),backgroundColor:'#fff',pointRadius:4}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{min:0,max:110,ticks:{callback:v=>v+'%'}},y:{type:'category',grid:{display:false}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.type==='scatter'?`P50 ${c.parsed.x.toFixed(0)}%`:`P10–P90 ${c.raw[0].toFixed(0)}–${c.raw[1].toFixed(0)}%`}}}}});
+  const hr=hist(A.rev.all,22,v=>fmt$(v));
+  mk('chRev',{type:'bar',data:{labels:hr.labels,datasets:[{data:hr.counts,backgroundColor:'#5fb0c9',borderRadius:3,barPercentage:0.95,categoryPercentage:1}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'simulated years'}},x:{ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:7}}}}});
+  const hm=hist(A.margin.all,22,v=>(v*100).toFixed(1)+'%');
+  mk('chMargin',{type:'bar',data:{labels:hm.labels,datasets:[{data:hm.counts,backgroundColor:hm.labels.map((_,i)=>hm.lo+hm.w*(i+0.5)<0?'#ff5c63':'#3ecf8e'),borderRadius:3,barPercentage:0.95,categoryPercentage:1}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'simulated years'}},x:{ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:7}}}}});
+  // waterfall
+  const c=A.costs,rev=A.rev.mean;const steps=[['Materials',c.mat],['Payroll',c.pay],['Dept overhead',c.ovh],['G&A',c.ga],['Handoffs',c.handoff],['AI tools',c.ai]].filter(s=>s[1]>0);
+  let run=rev;const wl=['Revenue'],wd=[[0,rev]],wc=['#3ecf8e'];steps.forEach(([l,v])=>{wl.push(l);wd.push([run-v,run]);wc.push('#ff5c63aa');run-=v;});wl.push('Profit');wd.push([0,run]);wc.push(run>=0?'#5fb0c9':'#ff5c63');
+  mk('chWater',{type:'bar',data:{labels:wl,datasets:[{data:wd,backgroundColor:wc,borderRadius:3}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>fmt$(x.raw[1]-x.raw[0])}}},scales:{y:{ticks:tickMoney},x:{grid:{display:false}}}}});
+  const cr=an.rows.slice().sort((a,b)=>b.cost-a.cost);
+  mk('chCost',{type:'bar',data:{labels:cr.map(r=>r.n.name),datasets:[
+    {label:'Payroll',data:cr.map(r=>r.x.pay),backgroundColor:'#9b7bff'},{label:'Materials',data:cr.map(r=>r.x.mat),backgroundColor:'#ff7a45'},
+    {label:'Overhead',data:cr.map(r=>r.x.ovh),backgroundColor:'#5fb0c9'},{label:'AI tools',data:cr.map(r=>r.x.ai),backgroundColor:'#3ecf8e'}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{stacked:true,ticks:tickMoney},y:{stacked:true,grid:{display:false}}},plugins:{tooltip:{callbacks:{label:x=>`${x.dataset.label}: ${fmt$(x.raw)}`}}}}});
+  const maxH=Math.max(1,...an.ai.map(x=>x.hours));
+  const grp={Automate:'#3ecf8e','Augment (copilot)':'#5fb0c9','Keep human':'#9b7bff'};
+  mk('chAI',{type:'bubble',data:{datasets:Object.keys(grp).map(g=>({label:g,backgroundColor:grp[g]+'aa',borderColor:grp[g],data:an.ai.filter(x=>x.rec===g).map(x=>({x:x.score,y:x.labor,r:4+16*Math.sqrt(x.hours/maxH),t:x.t.name,d:x.n.name}))}))},
+    options:{maintainAspectRatio:false,scales:{x:{min:0,max:100,title:{display:true,text:'AI suitability score'}},y:{ticks:tickMoney,title:{display:true,text:'labour value / yr'}}},
+      plugins:{tooltip:{callbacks:{label:x=>`${x.raw.t} (${x.raw.d}) · score ${x.raw.x} · ${fmt$(x.raw.y)}`}}}}});
+  drawQueue();drawCycle();
+}
+function drawQueue(){const id=$('#qSel')&&$('#qSel').value;if(!id)return;const w=RES.A.nodes[id].wq;
+  {const m=w.mean,avg=mean(m);let pk=0;m.forEach((v,i)=>{if(v>m[pk])pk=i;});const nm=esc(nodeById(id).name);const mo=new Date(START.getTime()+pk*7*864e5).toLocaleDateString('en-US',{month:'long'});
+   $('#qIns').innerHTML='<b class="il">Insight</b>'+(avg<0.2&&m[pk]<1?`${nm} almost never has work waiting — its capacity covers demand all year.`:`${nm}’s queue peaks in ${mo} at ≈ ${fmtN(m[pk],1)} jobs, ${fmtN(m[pk]/Math.max(avg,0.01),1)}× its yearly average — add temporary capacity or pull work forward before that peak.`);}const lb=w.mean.map((_,i)=>{const d=new Date(START.getTime()+i*7*864e5);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});});
+  mk('chQueue',{type:'line',data:{labels:lb,datasets:[{label:'P90',data:w.p90,borderWidth:0,pointRadius:0,backgroundColor:'#ff7a4533',fill:'+1'},{label:'P10',data:w.p10,borderWidth:0,pointRadius:0,fill:false},{label:'Mean',data:w.mean,borderColor:'#ff7a45',borderWidth:2,pointRadius:0,tension:.3}]},
+    options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'jobs waiting'}},x:{ticks:{maxTicksLimit:12,maxRotation:0}}}}});}
+function drawCycle(){const id=$('#cSel')&&$('#cSel').value;if(!id)return;const arr=RES.A.cycle[id]||[];
+  {const nm=esc(nodeById(id).name),p50=quant(arr,.5),p90=quant(arr,.9);
+   $('#cIns').innerHTML='<b class="il">Insight</b>'+(!arr.length?`No ${nm} job reaches revenue within the measured year — the cycle is longer than a year or the path is broken.`:`Half of ${nm} jobs turn into cash within ${fmtN(p50,0)} days, but 1 in 10 takes longer than ${fmtN(p90,0)} days — ${p90>1.5*p50?'that long tail is where the cash-flow risk sits':'delivery time is fairly predictable'}.`);}const h=hist(arr,24,v=>Math.round(v)+'d');
+  mk('chCycle',{type:'bar',data:{labels:h.labels,datasets:[{data:h.counts,backgroundColor:'#9b7bff',borderRadius:3,barPercentage:0.95,categoryPercentage:1}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:!!arr.length,text:arr.length?`P50 ${Math.round(quant(arr,.5))} d · P90 ${Math.round(quant(arr,.9))} d`:'',color:'#ececf1',align:'end',font:{weight:600}}},scales:{y:{title:{display:true,text:'jobs'}},x:{ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8}}}}});}
+function renderSnaps(){const el=$('#snapTbl');if(!el)return;
+  {const si=$('#snapIns');if(si){if(SNAPS.length<2)si.innerHTML='<b class="il">Insight</b>Save at least two scenarios (e.g. Baseline, then the AI plan or a hire) to see which one wins.';
+    else{const b0=SNAPS[0],best=SNAPS.slice().sort((a,b)=>b.profit-a.profit)[0];si.innerHTML=`<b class="il">Insight</b><b>${esc(best.name)}</b> gives the highest profit (${fmt$(best.profit)}${best===b0?'':`, ${best.profit>=b0.profit?'+':''}${fmt$(best.profit-b0.profit)} vs ${esc(b0.name)}`})${best.bott!==b0.bott?` and moves the bottleneck from ${esc(b0.bott)} to ${esc(best.bott)}`:''}.`;}}}
+  if(!SNAPS.length){el.innerHTML='<p class="cs" style="margin:0">No saved scenarios yet — press “Save as scenario” above.</p>';return;}
+  const b=SNAPS[0];const dl=(v,base,f,good=1)=>{if(v===base)return'';const d=v-base;const c=(d*good)>0?'var(--good)':'var(--bad)';return` <span style="color:${c};font-size:11px">${d>0?'+':''}${f(d)}</span>`;};
+  el.innerHTML=`<div style="overflow-x:auto"><table class="t" style="min-width:900px"><tr><th>Scenario</th><th class="n">Revenue</th><th class="n">Cost</th><th class="n">Profit</th><th class="n">Margin (P10)</th><th class="n">Rev / employee</th><th class="n">Headcount</th><th class="n">Jobs done</th><th class="n">Lost leads</th><th class="n">Cycle P50</th><th>Bottleneck</th><th></th></tr>
+  ${SNAPS.map((s,i)=>`<tr><td><b>${esc(s.name)}</b>${i===0?' <span class="pill p-hum">base</span>':''}</td><td class="n">${fmt$(s.rev)}${dl(s.rev,b.rev,fmt$)}</td><td class="n">${fmt$(s.cost)}${dl(s.cost,b.cost,fmt$,-1)}</td><td class="n">${fmt$(s.profit)}${dl(s.profit,b.profit,fmt$)}</td>
+    <td class="n">${pct(s.margin,1)} (${pct(s.marginP10,1)})</td><td class="n">${fmt$(s.rpe)}${dl(s.rpe,b.rpe,fmt$)}</td><td class="n">${fmtN(s.head,1)}</td><td class="n">${fmtN(s.won,0)}</td><td class="n">${fmtN(s.drops,0)}</td><td class="n">${fmtN(s.cycle,0)} d</td><td>${esc(s.bott)}</td><td><button class="x" data-del="${i}" title="Remove">×</button></td></tr>`).join('')}</table></div>`;
+  $$('[data-del]',el).forEach(x=>x.onclick=()=>{SNAPS.splice(+x.dataset.del,1);save();renderSnaps();});}
+async function runSens(){
+  const bt=$('#btnSens');bt.disabled=true;bt.textContent='Running…';
+  const drivers=[['Demand ±20%','demand',-20,20,'add'],['Win rate ±5pp','winShift',-5,5,'add'],['Contract value ±10%','price',-10,10,'add'],['Material cost ±10%','material',-10,10,'add'],
+    ['Salaries 0 / +10%','salaryInfl',0,10,'set'],['Absenteeism 0 / 10%','absent',0,10,'set'],['Rework ×0.5 / ×2','reworkMult',0.5,2,'mul'],['Supplier delay 0 / +30d','supplyDelay',0,30,'set']];
+  const N=150;const base=clone(SC);let done=0;const total=drivers.length*2+1;const pr=async sc=>{const r=await monteCarlo(M,sc,N,null,{series:false});done++;bt.textContent=`Running… ${done}/${total}`;return mean(r.map(x=>x.profit));};
+  const b=await pr(base);const out=[];
+  for(const [lbl,key,lo,hi,mode] of drivers){const mkv=v=>{const s=clone(base);s[key]=mode==='add'?(+base[key]||0)+v:mode==='mul'?(+base[key]||1)*v:v;return s;};
+    const a=await pr(mkv(lo)),c=await pr(mkv(hi));out.push({lbl,lo:a-b,hi:c-b});}
+  out.sort((x,y)=>Math.max(Math.abs(y.lo),Math.abs(y.hi))-Math.max(Math.abs(x.lo),Math.abs(x.hi)));
+  RES.sens={base:b,out};bt.disabled=false;bt.textContent='Run sensitivity';drawSens();}
+function drawSens(){const s=RES.sens;
+  {const t=s.out[0],l=s.out[s.out.length-1];const el=$('#sensIns');if(el)el.innerHTML=`<b class="il">Insight</b>Profit is most sensitive to <b>${esc(t.lbl)}</b> (${t.lo>0?'+':''}${fmt$(t.lo)} / ${t.hi>0?'+':''}${fmt$(t.hi)}) and least to ${esc(l.lbl)} — validate and manage the top two assumptions first.`;}
+  mk('chSens',{type:'bar',data:{labels:s.out.map(o=>o.lbl),datasets:[{label:'Low setting',data:s.out.map(o=>o.lo),backgroundColor:'#ff7a45'},{label:'High setting',data:s.out.map(o=>o.hi),backgroundColor:'#5fb0c9'}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{ticks:tickMoney,title:{display:true,text:`change in mean profit vs ${fmt$(s.base)} (150 runs each)`}},y:{stacked:true,grid:{display:false}}},plugins:{tooltip:{callbacks:{label:x=>`${x.dataset.label}: ${x.raw>0?'+':''}${fmt$(x.raw)}`}}}}});}
+
+/* =====================================================================
+   View switching + boot
+   ===================================================================== */
+function showView(v){if(v==='insights'){v='model';setTimeout(()=>$('#results').scrollIntoView({behavior:'smooth'}),50);}$$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$$('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));
+  if(v==='scenario')renderScenario();if(v==='model')requestAnimationFrame(()=>renderNodes());}
+$$('#tabs button').forEach(b=>b.onclick=()=>showView(b.dataset.v));
+applyView();renderWsTabs();renderAll();renderScenario();renderInsights();openSharedFromHash();
+requestAnimationFrame(()=>requestAnimationFrame(fit));
+window.addEventListener('resize',()=>{});
+</script>
+</body>
+</html>
