@@ -29,7 +29,7 @@ Lines connect a *finished task* to the *next task*, so one department can appear
 
 ## Workspaces and sharing
 
-- Each tab is its own workspace. The crane sample opens in one tab and an empty workspace in another; **+** adds more.
+- Each tab is its own workspace. The Pionova sample opens in one tab and an empty workspace in another; **+** adds more.
 - **Share** copies a link that holds the whole workspace, compressed into the URL fragment (`#m=…`). Opening the link loads it into a new tab. Nothing is uploaded to a server.
 - Models can also be exported and imported as JSON.
 
@@ -45,11 +45,11 @@ Then open http://localhost:8910. Opening `index.html` directly also works.
 
 ## Samples
 
-**Pionova Construction Management (GTA)** is the default sample. It is a fictional Ontario construction manager with a CEO (Nima), 3 project managers, a 2-person social media team, 1 accountant, 2 heads of site, and external subtrades and material suppliers. It runs three streams:
+**Pionova Construction Management (GTA)** is the default sample. It models an Ontario construction manager with a CEO (Nima), 3 project managers, a 2-person social media team, 1 accountant, 2 heads of site, and external subtrades and material suppliers. It runs three streams:
 - **Commercial tenders** (Bids&Tenders, MERX, GCs): takeoff → CEO go/no-go → bid → CCDC contract and bonding → pre-con and City permit → materials → mobilization and OHSA safety plan → structure → progress draw #1 → supervision and municipal inspections (with a rework loop) → MEP and finishes → progress draw #2 at substantial performance → deficiencies → holdback release after 60 days (Construction Act).
 - **Residential renovations** from social media and referral leads: qualify → site visit → proposal → contract and 25% deposit → permit → materials → reno trades → handover → final invoice.
 - **Change orders**: price → CEO approval → invoice.
 
-**Atlas Cranes** is a crane manufacturer sample. It covers tender → engineering validation → negotiation → contract → design → planning → fabrication → assembly and load test → commissioning → invoicing, plus aftermarket service. Open it from the crane icon on the left rail.
+**Atlas Cranes** is a fictional crane manufacturer sample. It covers tender → engineering validation → negotiation → contract → design → planning → fabrication → assembly and load test → commissioning → invoicing, plus aftermarket service. Open it from the crane icon on the left rail.
 
 **All figures in both samples are illustrative assumptions for a demo, not real company data.**
